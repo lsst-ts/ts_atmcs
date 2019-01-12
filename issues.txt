@@ -1,0 +1,56 @@
+Is there a brake for M3 rotation? The XML doesn't have one, but I'd expect it to be necessary.
+
+I would like much more information about these following enums. Why do they copy the summary state enum values and what exactly do the other values mean? For instance how do you enable tracking for one axis and not another? How do you send an axis offline?
+
+AtMountState_DisabledState,AtMountState_EnabledState,AtMountState_FaultState,AtMountState_OfflineState,AtMountState_StandbyState,AtMountState_TrackingDisabledState,AtMountState_TrackingEnabledState,AtMountState_StoppingState
+
+Based on its name I am guessing that m3PortSelected selects the *requested* port, not the current port. I guess that with "in position" tells one all one needs to know.
+
+-- sent 2018-01-14
+
+Do we need a home command, or do all axes (including M3 rotation) have absolute encoders (on the axis itself, not just the motor, like dome azimuth)?
+
+What happens if an axis goes out of closed loop? I am guessing that its brake goes on.
+
+Does stopTracking also stop M3 rotation? If not, we need a way to do so. If so, the name could use improvement.
+
+I suspect we want two ways to stop tracking: one as quickly as possible, like pushing an estop, and another that uses the motors. (The simulator assumes that stopTracking stops axes gently and waits for that to finish)
+
+We have one set of events for brakes with one field: "engaged".
+Don't we want to know when they are fully disengaged, as well?
+Surely they take some time to activate and deactivate.
+(The simulator assumes they are instantaneous, so always fully engaged or fully disengaged)
+
+Why does trackTarget have field azimuthDirection?
+(The simulator ignores it)
+
+What happens when an axis goes out of range or hits a limit switch?
+Do we halt all axes or just that one?
+Do we put on the brakes? If so that makes it hard to back out.
+For any extra axes do we halt them gently or as quickly as possible?
+(The simulator assumes that we halt just the one axis, instantly,
+and the code needs to be changed to put on the brake as well)
+
+Is there a time limit for the next trackTarget to arrive?
+If so, what happens if it is exceeded?
+(The simulator ignores the issue for now -- no time limit)
+
+Does setInstrumentPort wait for the M3 to move?
+I'm guessing not -- wait for the event "in position" instead.
+Waiting is a bit tricky because we have to abort the wait if we stop motion.
+(The simulator does not wait.)
+
+Do startTracking and stopTracking ignore their boolean arguments?
+(The simulator assumes that they do)
+
+Does startTracking do more than enable the drives and remove brakes, and how long does it take?
+(The simulator assumes it does what I asked and it does so instantly)
+
+Why does trackTarget specify separate information for the NA1 and NA2 rotators?
+It seems a waste of resources to be providing tracking updates for a rotator M3 is not pointing to.
+I realize it can be useful to turn a rotator when M3 is not pointing to it, but that sounds more like an an engineering operation, not something to routinely do while tracking.
+
+My understandingi s that we are sending trackTarget at 20Hz.
+If so, why so frequently? Position, velocity and time is enough information to allow much less frequent updates.
+
+The help strings in the XML are mostly incorrect.

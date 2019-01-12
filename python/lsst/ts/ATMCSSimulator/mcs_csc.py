@@ -22,6 +22,8 @@
 __all__ = ["ATMCSCsc"]
 
 import asyncio
+import enum
+import time
 
 import numpy as np
 
@@ -29,6 +31,14 @@ from lsst.ts import salobj
 from .actuator import Actuator
 
 import SALPY_ATMCS
+
+
+class Axis(enum.IntEnum):
+    Azimuth = 0
+    Elevation = 1
+    NA1 = 2
+    NA2 = 3
+    M3 = 4
 
 
 class ATMCSCsc(salobj.BaseCsc):
@@ -56,8 +66,7 @@ class ATMCSCsc(salobj.BaseCsc):
 
     **Limitations**
 
-    * Accleration and jerk are infinite.
-    * Reported torque is always 0.
+    * Jerk is infinite.
     * The two azimuth motors are identical.
     * The only way to hit a limit switch is to configure the position
       of that switch within the command limits for that axis.
@@ -67,27 +76,36 @@ class ATMCSCsc(salobj.BaseCsc):
       * CCW active if az < az1
       * CW active if az > az2
       * neither active otherwise
+    * The path generator is a bit primitive in that it always computes
+      a trapezoidal slew, even while tracking. In practice the resulting
+      path is probably going to be perfectly usable.
+    * The home position is always the minimum commanded position;
+      this would be easy to change if desired.
     """
     def __init__(self, initial_state=salobj.State.STANDBY, initial_simulation_mode=1):
         super().__init__(SALPY_ATMCS, index=0, initial_state=initial_state,
                          initial_simulation_mode=initial_simulation_mode)
         self.telemetry_interval = 0.2  # seconds
+        self.stop_gently_task = None
 
         # data for event topics
         self.m3State_data = self.evt_m3State.DataType()
         self.elevationInPosition_data = self.evt_elevationInPosition.DataType()
         self.azimuthInPosition_data = self.evt_azimuthInPosition.DataType()
-        self.allAxesInPosition_data = self.evt_allAxesInPosition.DataType()
         self.nasmyth1RotatorInPosition_data = self.evt_nasmyth1RotatorInPosition.DataType()
+        self.nasmyth2RotatorInPosition_data = self.evt_nasmyth2RotatorInPosition.DataType()
+        self.m3InPosition_data = self.evt_m3InPosition.DataType()
+        self.allAxesInPosition_data = self.evt_allAxesInPosition.DataType()
         self.azimuthLimitSwitchCCW_data = self.evt_azimuthLimitSwitchCCW.DataType()
         self.elevationLimitSwitchUpper_data = self.evt_elevationLimitSwitchUpper.DataType()
         self.nasmyth1LimitSwitchCW_data = self.evt_nasmyth1LimitSwitchCW.DataType()
         self.nasmyth2LimitSwitchCCW_data = self.evt_nasmyth2LimitSwitchCCW.DataType()
         self.azimuthBrake1_data = self.evt_azimuthBrake1.DataType()
+        self.azimuthBrake2_data = self.evt_azimuthBrake2.DataType()
         self.elevationBrake_data = self.evt_elevationBrake.DataType()
         self.nasmyth1Brake_data = self.evt_nasmyth1Brake.DataType()
+        self.nasmyth2Brake_data = self.evt_nasmyth2Brake.DataType()
         self.azimuthToppleBlockCCW_data = self.evt_azimuthToppleBlockCCW.DataType()
-        self.azimuthBrake2_data = self.evt_azimuthBrake2.DataType()
         self.nasmyth1LimitSwitchCCW_data = self.evt_nasmyth1LimitSwitchCCW.DataType()
         self.azimuthToppleBockCW_data = self.evt_azimuthToppleBlockCW.DataType()
         self.nasmyth2LimitSwitchCW_data = self.evt_nasmyth2LimitSwitchCW.DataType()
@@ -98,13 +116,11 @@ class ATMCSCsc(salobj.BaseCsc):
         self.nasmyth1DriveStatus_data = self.evt_nasmyth1DriveStatus.DataType()
         self.nasmyth2DriveStatus_data = self.evt_nasmyth2DriveStatus.DataType()
         self.m3DriveStatus_data = self.evt_m3DriveStatus.DataType()
-        self.nasmyth2RotatorInPosition_data = self.evt_nasmyth2RotatorInPosition.DataType()
         self.elevationLimitsSwitchLower_data = self.evt_elevationLimitSwitchLower.DataType()
         self.atMountState_data = self.evt_atMountState.DataType()
         self.m3RotatorLimitSwitchCW_data = self.evt_m3RotatorLimitSwitchCW.DataType()
         self.m3RotatorLimitSwitchCCW_data = self.evt_m3RotatorLimitSwitchCCW.DataType()
         self.m3RotatorDetentLimitSwitch_data = self.evt_m3RotatorDetentLimitSwitch.DataType()
-        self.m3InPosition_data = self.evt_m3InPosition.DataType()
         self.m3PortSelected_data = self.evt_m3PortSelected.DataType()
 
         # data for telemetry topics
@@ -113,20 +129,136 @@ class ATMCSCsc(salobj.BaseCsc):
         self.measuredTorque_data = self.tel_measuredTorque.DataType()
         self.measuredMotorVelocity_data = self.tel_measuredMotorVelocity.DataType()
         self.mountMotorEncoders_data = self.tel_mountMotorEncoders.DataType()
+        """Index of rotator for current index port, or None of no rotator.
+
+        Values:
+
+        * NA1: 2
+        * NA2: 3
+        * other: None
+        """
+        self.port_info_dict = {
+            SALPY_ATMCS.ATMCS_shared_M3ExitPort_Nasmyth1: 0,
+            SALPY_ATMCS.ATMCS_shared_M3ExitPort_Nasmyth2: 1,
+            SALPY_ATMCS.ATMCS_shared_M3ExitPort_Port3: 2,
+        }
+        """Dict of port enum: port_az index"""
+
+        self.min_lim_names = (
+            "azimuthLimitSwitchCW",
+            "elevationLimitSwitchLower",
+            "nasmyth1LimitSwitchCW",
+            "nasmyth2LimitSwitchCW",
+            "m3RotatorLimitSwitchCW",
+        )
+        """Name of minimum limit switch event for each axis."""
+
+        self.max_lim_names = (
+            "azimuthLimitSwitchCCW",
+            "elevationLimitSwitchUpper",
+            "nasmyth1LimitSwitchCCW",
+            "nasmyth2LimitSwitchCCW",
+            "m3RotatorLimitSwitchCCW",
+        )
+        """Name of maximum limit switch event for each axis."""
+
+        self.in_position_names = (
+            "azimuthInPosition",
+            "elevationInPosition",
+            "nasmyth1RotatorInPosition",
+            "nasmyth2RotatorInPosition",
+            "m3InPosition",
+        )
+        """Name of "in position" event for each individual axis;
+        excludes ``allAxesInPosition``.
+        """
+
+        self.drive_status_names = (
+            "azimuthDrive1Status",
+            "azimuthDrive2Status",
+            "elevationDriveStatus",
+            "nasmyth1DriveStatus",
+            "nasmyth2DriveStatus",
+            "m3DriveStatus",
+        )
+        """Name of status for each drive motor."""
+
+        self.brake_names = (
+            "azimuthBrake1",
+            "azimuthBrake2",
+            "elevationBrake",
+            "nasmyth1Brake",
+            "nasmyth2Brake",
+        )
+        """Name of brake for each drive motor.
+
+        Warning: there is no brake for M3.
+        """
+
+        self.drive_indices = {
+            Axis.Azimuth: (0, 1),
+            Axis.Elevation: (2,),
+            Axis.NA1: (3,),
+            Axis.NA2: (4,),
+            Axis.M3: (5,),
+        }
+        """Dict of axis: tuple of one or more drive motor indices."""
+
+        self.tracking_enabled = False
+        """Has tracking been enabled by startTracking?
+
+        This remains true until stopTracking is called or the
+        summary state is no longer salobj.State.Enabled,
+        even if some drives have been disabled by running into limits.
+        """
+
+        self.axis_enabled = np.zeros([5], dtype=bool)
+
+        self.axis_braked = np.zeros([5], dtype=bool)
+        """If True the axis has its brakes (if any) applied
+
+        In this state axis_enabled should be False
+        and the actuator should be halted.
+        """
+
+        self.in_position_counts = np.zeros(5, dtype=int)
+        """Number of consecutive tests where each axis was in position.
+
+        This should be updated every time telemetry is output,
+        and if the count is > needed_in_pos then stop it there.
+        """
 
         self._initialized = False
         self.initialize()
-
         self.configure()
 
+    def drive_status_names_per_actuator(self, axis):
+        axis = Axis(axis)
+        if axis == 0:
+            return self.drive_status_names[0], self.drive_status_names[1]
+        else:
+            return self.drive_status_names[axis+1]
+
+    def brake_names_per_actuator(self, axis):
+        axis = Axis(axis)
+        if axis == 0:
+            return self.brake_names[0], self.brake_names[1]
+        else:
+            return self.brake_names[axis+1]
+
     def configure(self,
-                  min_cmd=(-180, 5, -360),
-                  max_cmd=(360, 90, 360),
-                  min_lim=(-182, 3, 362),
-                  max_lim=(362, 92, 362),
-                  vel=(5, 5, 5),
-                  accel=(3, 3, 3),
+                  min_cmd=(-180, 5, -360, -360, 0),
+                  max_cmd=(360, 90, 360, 360, 180),
+                  min_lim=(-182, 3, -362, -362, -2),
+                  max_lim=(362, 92, 362, 362, 182),
+                  max_vel=(5, 5, 5, 5, 5),
+                  max_accel=(3, 3, 3, 3, 3),
+                  max_in_position_err=(0.01, 0.01, 0.01, 0.01, 0.01),
+                  min_in_position_num=3,
                   topple_az=(2, 5),
+                  port_az=(0, 90, 180),
+                  m3_detent_range=0.01,
+                  needed_in_pos=3,
                   ):
         """Set configuration.
 
@@ -140,12 +272,21 @@ class ATMCSCsc(salobj.BaseCsc):
             Position of minimum limit switch for each axis_, in deg
         max_lim : ``iterable`` of 5 `float`
             Position of maximum limit switch for each axis_, in deg
-        vel : ``iterable`` of 5 `float`
+        max_vel : ``iterable`` of 5 `float`
             Maximum velocity of each axis, in deg/sec
-        accel : ``iterable`` of 5 `float`
+        max_accel : ``iterable`` of 5 `float`
             Maximum acceleration of each axis, in deg/sec
+        max_in_position_err : ``iterable`` of 5 `float`
+            Maximum allowed error for each axis to be in position (deg)
+        min_in_position_num : `int`
+            Minimum number of consecutive times an axis must be in position
+            before being reported as such.
         topple_az : ``iterable`` of 2 `float`
             Min, max azimuth at which the topple block moves, in deg
+        port_az : ``iterable`` of 3 `float`
+            Position of each instrument port: NA1, NA2 and Port3
+        m3_detent_range : `float`
+            Maximum error beyond which the M3 detent disengages (deg)
         """
         def convert_values(name, values, nval):
             out = np.array(values, dtype=float)
@@ -159,77 +300,231 @@ class ATMCSCsc(salobj.BaseCsc):
         max_cmd = convert_values(max_cmd, 5)
         min_lim = convert_values(min_lim, 5)
         max_lim = convert_values(max_lim, 5)
-        vel = convert_values(vel, 5)
-        accel = convert_values(accel, 5)
-        if vel.min() <= 0:
-            raise salobj.ExpectedError(f"vel={vel}; all values must be positive")
-        if accel.min() <= 0:
-            raise salobj.ExpectedError(f"accel={vel}; all values must be positive")
-        topple_az = convert_values(vel, 2)
+        max_vel = convert_values(max_vel, 5)
+        max_accel = convert_values(max_accel, 5)
+        max_in_position_err = convert_values(max_in_position_err, 5)
+        min_in_position_num = int(min_in_position_num)
+        if max_vel.min() <= 0:
+            raise salobj.ExpectedError(f"max_vel={max_vel}; all values must be positive")
+        if max_accel.min() <= 0:
+            raise salobj.ExpectedError(f"max_accel={max_accel}; all values must be positive")
+        if max_in_position_err.min() <= 0:
+            raise salobj.ExpectedError(f"max_in_position_err={max_in_position_err}; "
+                                       "all values must be positive")
+        if min_in_position_num <= 0:
+            raise salobj.ExpectedError(f"min_in_position_num={min_in_position_num}; must be positive")
+        topple_az = convert_values(topple_az, 2)
+        port_az = convert_values(port_az, 3)
+        m3_detent_range = float(m3_detent_range)
+        if m3_detent_range <= 0:
+            raise salobj.ExpectedError(f"m3_detent_range={m3_detent_range} must be positive")
 
         self.min_cmd = min_cmd
         self.max_cmd = max_cmd
         self.min_lim = min_lim
         self.max_lim = max_lim
+        self.max_vel = max_vel
+        self.max_in_position_err = max_in_position_err
+        self.min_in_position_num = min_in_position_num
         self.topple_az = topple_az
-        self.actuators = [Actuator(vmax=vel[i], amax=accel[i]) for i in range(5)]
+        self.port_az = port_az
+        self.m3_detent_range = m3_detent_range
+
+        self.actuators = [Actuator(vmax=max_vel[axis], amax=max_accel[axis]) for axis in Axis]
 
     def do_startTracking(self, id_data):
-        raise salobj.ExpectedError("Not yet implemented")
+        self.assert_enabled("startTracking")
+        if self.stop_gently_task and not self.stop_gently_task.done():
+            raise salobj.ExpectedError("stopTracking not finished yet")
+        self.enable_tracking()
 
     def do_trackTarget(self, id_data):
-        raise salobj.ExpectedError("Not yet implemented")
+        self.assert_enabled("trackTarget")
+        if not self.tracking_enabled:
+            raise salobj.ExpectedError("trackTarget disallowed: drives not enabled")
+        data = id_data.data
+        pos = np.array([data.azimuth, data.elevation,
+                        data.nasmyth1RotatorAngle, data.nasmyth2RotatorAngle], dtype=float)
+        vel = np.array([data.azimuthVelocity, data.elevationVelociy,
+                       data.nasmyth1RotatorAngleVelocity, data.nasmyth2RotatorAngleVelocity], dtype=float)
+        if np.any(pos < self.min_cmd[0:4]) or np.any(pos > self.max_cmd[0:4]):
+            raise salobj.ExpectedError(f"One or more commanded positions out of range")
+        if np.any(np.abs(vel) > self.max_vel[0:4]):
+            raise salobj.ExpectedError(f"One or more commanded velocities out of range")
+        for i in range(4):
+            self.actuators[i].set_cmd(pos=pos[i], vel=vel[i])
 
     def do_setInstrumentPort(self, id_data):
-        raise salobj.ExpectedError("Not yet implemented")
+        self.assert_enabled("setInstrumentPort")
+        port = id_data.data.port
+        try:
+            port_az_ind = self.port_info_dict[port]
+        except IndexError:
+            raise salobj.ExpectedError(f"Invalid port={port}")
+        try:
+            port_az = self.port_az[port_az_ind]
+        except IndexError:
+            raise RuntimeError(f"Bug! invalid port_az_ind={port_az_ind} for port={port}")
+        self.actuators[Axis.M3].set_cmd(pos=port_az, vel=0)
+        self.set_event_field("m3PortSelected", "selected", port)
 
-    def do_stopTracking(self, id_data):
-        raise salobj.ExpectedError("Not yet implemented")
+    async def do_stopTracking(self, id_data):
+        self.assert_enabled("stopTracking")
+        if self.stop_gently_task and not self.stop_gently_task.done():
+            raise salobj.ExpectedError("Already stopping")
+        self.stop_gently_task = self.stop_gently()
+        await self.stop_gently_task
+        self.stop_gently_task = None
 
     def initialize(self):
-        enable = self.summary_state == salobj.State.ENABLED
-        self.enable_drives(enable)
-        self.update_limit_switch_state()
+        self.disable_tracking(gently=False)
+        self.update_events()
         self._initialized = True
 
-    def update_limit_switch_state(self):
-        """Set state of limit switches, including azimuth topple_ccw_cw block."""
-        axis_names = ("azimuth", "altitude", "nasmyth1", "nasmyth2", "m3Rotator")
-        in_reverse_limit = np.curr_pos < np.min_lim
-        in_forward_limit = np.curr_pos > np.max_lim
-        for i, axis in enumerate(axis_names):
-            self.set_event_field(f"{axis}LimitSwitchCW", "active", in_forward_limit[i])
-            self.set_event_field(f"{axis}LimitSwitchCCW", "active", in_reverse_limit[i])
+    async def stop_gently(self):
+        """Stop the axes (but not M3) gently.
 
-        if self.curr_pos < self.topple_az[0]:
+        Stop M3 abruptly.
+        """
+        try:
+            end_times = []
+            for actuator in self.actuators[0:4]:
+                actuator.stop()
+                end_times.append(actuator.curr[-1].t0)
+            max_end_time = max(end_times)
+            dt = max_end_time - time.time()
+            if dt > 0:
+                await asyncio.sleep(dt)
+        finally:
+            self.disable_tracking(gently=True)
+
+    def update_events(self):
+        """Set state of the various events.
+
+        Includes state of drives, brakes, limit switches, azimuth topple block,
+        M3 detents and "in position".
+
+        Does *not* include ``m3PortSelected`` because that only needs
+        to be set by `do_setInstrumentPort`.
+
+        Report events that have changed,
+        and for axes that have run into a limit switch, abort the axis,
+        disable its drives and set its brakes.
+        """
+        t = time.time()
+        curr_pos = [actuator.curr.pva(t)[0] for actuator in self.actuators]
+
+        # Handle limit switches
+        # including aborting axes that are out of limits
+        # and putting on their brakes (if any)
+        abort_axes = []
+        for axis in Axis:
+            self.set_event_field(self.min_lim_names[axis], "active", curr_pos[axis] < self.min_lim[axis])
+            self.set_event_field(self.max_lim_names[axis], "active", curr_pos[axis] > self.max_lim[axis])
+            if curr_pos[axis] < self.min_lim[axis] or curr_pos[axis] > self.max_lim[axis]:
+                abort_axes.append(axis)
+        for axis in abort_axes:
+            self.actuators[axis].abort()
+            self.axis_enabled[axis] = False
+            self.axis_braked[axis] = True
+
+        # Handle brakes
+        for axis in Axis[0:-1]:  # omit M3 which has no brake
+            for drive_index in self.drive_indices(axis):
+                for brake_name in self.brake_names(drive_index):
+                    self.set_event_field(brake_name, "engage", self.axis_braked[axis])
+
+        # Handle atMountState
+        if self.tracking_enabled:
+            mount_state = SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingEnabledState
+        else:
+            curr_vel = np.array([actuator.curr.pva(t)[1] for actuator in self.actuators])
+            if all(curr_vel == 0.0):
+                mount_state = SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabledState
+            else:
+                mount_state = SALPY_ATMCS.ATMCS_shared_AtMountState_StoppingState
+        self.set_event_field("atMountState", "state", mount_state)
+
+        # Handle azimuth topple block
+        if curr_pos[Axis.Azimuth] < self.topple_az[0]:
             self.set_event_field("azimuthToppleBockCCW", "active", True)
             self.set_event_field("azimuthToppleBockCW", "active", False)
-        elif self.curr_pos > self.topple_az[1]:
+        elif curr_pos[Axis.Azimuth] > self.topple_az[1]:
             self.set_event_field("azimuthToppleBockCCW", "active", False)
             self.set_event_field("azimuthToppleBockCW", "active", True)
         else:
             self.set_event_field("azimuthToppleBockCCW", "active", False)
             self.set_event_field("azimuthToppleBockCW", "active", False)
 
-    def enable_drives(self, enable):
-        """Enable or disable all drives and toggle brakes accordingly.
+        # Handle M3 detent switch
+        at_port = [abs(curr_pos[Axis.M3] - az) < self.m3_detent_range for az in self.port_az]
+        did_change = False
+        # field order must match the port order in ``port_az``
+        for i, field in enumerate(("nasmyth1DetentActive", "nasmyth2DetentActive", "port3DetentActive")):
+            did_change |= getattr(self.m3RotatorDetentLimitSwitch_data, field) != at_port[i]
+            setattr(self.m3RotatorDetentLimitSwitch_data, field, at_port[i])
+        if did_change:
+            self.evt_m3RotatorDetentLimitSwitch.put(self.m3RotatorDetentLimitSwitch_data)
+
+        # Handle "in position" events, including ``allAxesInPosition``
+        if not self.tracking_enabled:
+            self.set_event_field("allAxesInPosition", "inPosition", False)
+        else:
+            for axis in Axis:
+                if self.axis_braked[axis] or not self.axis_enabled[axis]:
+                    in_position = False
+                else:
+                    cmd_pos = self.actuators[axis].cmd.pva(t)[0]
+                    in_position = abs(curr_pos[axis] - cmd_pos) < self.max_in_position_err
+                if in_position:
+                    self.in_position_counts[axis] += 1
+                    if self.in_position_counts[axis] >= self.min_in_position_num:
+                        self.set_event_field(self.in_position_names[axis], "inPosition", True)
+                        self.in_position_counts[axis] = self.min_in_position_num
+                else:
+                    self.in_position_counts[axis] -= 1
+                    if self.in_position_counts[axis] <= 0:
+                        self.set_event_field(self.in_position_names[axis], "inPosition", False)
+                        self.in_position_counts[axis] = 0
+            all_axes_in_position = all([getattr(f"evt_{name}", "inPosition")
+                                       for name in self.in_position_names])
+            self.set_event_field("allAxesInPosition", "inPosition", all_axes_in_position)
+
+    def disable_tracking(self, gently):
+        """Disable tracking.
+
+        Parameters
+        ----------
+        gently : `bool`
+            If True then stop the axis.
+            If False then abort the axis and apply the brake.
+        """
+        for axis in Axis:
+            self.axis_enabled[axis] = False
+            if gently:
+                self.actuators[axis].stop()
+            else:
+                self.actuators[axis].abort()
+                self.axis_braked[axis] = True
+        self.tracking_enabled = False
+        self.update_events()
+
+    def enable_tracking(self):
+        """Enable tracking.
+
+        Enable or disable all drives and set ``tracking_enabled``.
 
         Parameters
         ----------
         enable : `bool`
-            If True the enable all axes.
+            If True then enable all axes.
             If False then disable all axes.
         """
-        for drive_prefix in ("azimuthDrive1", "azimuthDrive2",
-                             "altitudeDrive",
-                             "nasmyth1Drive", "nasmyth2Drive",
-                             "m3Drive"):
-            evt_name = f"{drive_prefix}Status"
-            self.set_event_field(evt_name=evt_name, field_name="enable", value=enable)
-
-        for prefix in ("elevation", "nasmyth1"):
-            evt_name = f"{prefix}Brake"
-            self.set_event_field(evt_name=evt_name, field_name="engage", value=not enable)
+        for axis in Axis:
+            self.axis_enabled[axis] = True
+            self.axis_braked[axis] = False
+        self.tracking_enabled = True
+        self.update_events()
 
     def set_event_field(self, evt_name, field_name, value):
         """Set a field for any event and output it if changed
@@ -254,9 +549,14 @@ class ATMCSCsc(salobj.BaseCsc):
         super().report_summary_state()
         if self.summary_state in (salobj.State.DISABLED, salobj.State.ENABLED):
             asyncio.ensure_future(self.telemetry_loop())
+        if self.summary_state != salobj.State.ENABLED:
+            for axis in Axis:
+                self.axis_braked[axis] = True
+            self.disable_tracking(gently=False)
 
     async def telemetry_loop(self):
         while self.summary_state in (salobj.State.DISABLED, salobj.State.ENABLED):
+            self.update_events()
             self.tel_mountEncoders.put(self.mountEncoders_data)
             self.tel_torqueDemand.put(self.torqueDemandData)
             self.tel_measuredTorque.put(self.measuredTorqueData)

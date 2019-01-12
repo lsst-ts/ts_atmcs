@@ -73,3 +73,22 @@ class Actuator:
             Time (unix seconds, e.g. from time.time())
         """
         return self.curr.pva(t)
+
+    def stop(self):
+        """Stop the axis using maximum acceleration.
+
+        Update the commanded position to match the end point of the stop.
+        """
+        t0 = time.time()
+        p0, v0 = self.pva(t0)[0:2]
+        self.curr = slew.stop(p0=p0, v0=v0, t0=t0, amax=self.amax)
+        self.cmd = self.curr[-1]
+
+    def abort(self):
+        """Stop motion immediately.
+
+        Do not change the commanded position.
+        """
+        t0 = time.time()
+        p0 = self.pva(t0)[0]
+        self.curr = path.Path(path.PVAT(t0=t0, p0=p0, a=0, v0=0))

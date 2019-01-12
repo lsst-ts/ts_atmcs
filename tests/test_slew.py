@@ -201,5 +201,59 @@ class TestSlew(unittest.TestCase):
                 ATMCSSimulator.slew.slew(pA=pA, pB=pB, vA=vA, vB=sign*vmax*fudge, t0=t0, vmax=vmax, amax=amax)
 
 
+class TestStop(unittest.TestCase):
+    def check_path(self, path, p0, v0, t0, amax):
+        """Check various aspects of a path
+
+        Checks the following:
+        - The initial time is correct.
+        - Times increase monotonically.
+        - The position and velocity at the end of each segment
+          matches the start of the next.
+        - The final position and velocity are correct.
+        """
+        self.assertAlmostEqual(path[0].t0, t0)
+        self.assertAlmostEqual(path[0].p0, p0)
+        self.assertAlmostEqual(path[0].v0, v0)
+
+        self.assertIn(len(path), (1, 2))
+
+        self.assertEqual(path[-1].v0, 0)
+        self.assertEqual(path[-1].a, 0)
+
+        if len(path) > 1:
+            pvat0 = path[0]
+            pvat1 = path[1]
+            dt = pvat1.t0 - pvat0.t0
+            self.assertGreater(dt, 0)
+            pred_p1 = pvat0.p0 + dt*(pvat0.v0 + dt*0.5*pvat0.a)
+            pred_v1 = pvat0.v0 + dt*pvat0.a
+            self.assertAlmostEqual(pvat1.p0, pred_p1, places=4)
+            self.assertAlmostEqual(pvat1.v0, pred_v1, places=4)
+
+    def test_already_stopped(self):
+        """Test stop when already stopped."""
+        # Arbitrary but reasonable values
+        t0 = 1550000000
+        amax = 2
+
+        for p0 in (-5, 0, 30):
+            path = ATMCSSimulator.slew.stop(p0=p0, v0=0, t0=t0, amax=amax)
+            self.assertEqual(len(path), 1)
+            self.check_path(path, p0=p0, v0=0, t0=t0, amax=amax)
+
+    def test_invalid_inputs(self):
+        # Arbitrary but reasonable values
+        t0 = 1530000000
+        p0 = 1
+        v0 = -2
+
+        # amax must be >= 0
+        with self.assertRaises(ValueError):
+            ATMCSSimulator.slew.stop(p0=p0, v0=v0, t0=t0, amax=0)
+        with self.assertRaises(ValueError):
+            ATMCSSimulator.slew.stop(p0=p0, v0=v0, t0=t0, amax=-1)
+
+
 if __name__ == '__main__':
     unittest.main()

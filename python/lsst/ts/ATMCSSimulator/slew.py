@@ -1,6 +1,6 @@
 # This file comes from
 
-__all__ = ["slew"]
+__all__ = ["slew", "stop"]
 
 import math
 import sys
@@ -80,9 +80,9 @@ def slew(pA, pB, vA, vB, t0, vmax, amax):
            4      vB  0   unlimited
     """
     if vmax <= 0.0:
-        raise ValueError("vmax=%s < 0" % (vmax,))
+        raise ValueError(f"vmax={vmax} < 0")
     if amax <= 0.0:
-        raise ValueError("amax=%s < 0" % (amax,))
+        raise ValueError(f"amax={amax} < 0")
 
     # check velocities; errors are: |vB| FUDGE > vmax,
     # |vA| FUDGE > vmax (can lead to dt1 < 0 for type 2 slews)
@@ -212,6 +212,53 @@ def slew(pA, pB, vA, vB, t0, vmax, amax):
         # if the last PVAT has non-zero acceleraton then append
         # a segment with zero acceleration
         pvats.append(path.PVAT(p0=p40, v0=v40, a=0, t0=t40))
+    for pvat in pvats:
+        pvat.t0 += t0
+
+    return path.Path(*pvats)
+
+
+def stop(p0, v0, t0, amax):
+    """Compute a path to stop as quickly as possible.
+
+    Parameters
+    ----------
+    p0 : `float`
+        Starting position (deg)
+    v0 : `float`
+        Starting velocity (deg/sec)
+    t0 : `float`
+        Start time of path.
+    amax : `float`
+        Maximum allowed acceleration (deg/sec^2)
+
+    Returns
+    -------
+    path : `Path`
+        A path with 1-2 segments, ending with a segment of zero acceleration
+        and zero velocity.
+
+    Raises
+    ------
+    ValueError if |amax| <= 0
+    """
+    if amax <= 0.0:
+        raise ValueError(f"amax={amax} < 0")
+
+    if v0 == 0:
+        return path.Path(path.PVAT(p0=p0, v0=0, a=0, t0=t0))
+
+    pvats = []
+    # t0 is typically large enough that small time changes
+    # have poor accuracy, so to improve accuracy
+    # compute the path segments using t0 = 0
+    # then offset all the times before returning the path
+    dt = abs(v0)/amax
+    accel = math.copysign(amax, v0)
+    p1 = p0 + dt*(v0 + dt*0.5*accel)
+    pvats.append(path.PVAT(p0=p0, v0=v0, a=accel, t0=0))
+    pvats.append(path.PVAT(p0=p1, v0=0, a=0, t0=dt))
+
     for pvat in pvats:
         pvat.t0 += t0
 
