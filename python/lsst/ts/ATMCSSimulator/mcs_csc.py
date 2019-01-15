@@ -88,40 +88,40 @@ class ATMCSCsc(salobj.BaseCsc):
         self.telemetry_interval = 0.2  # seconds
         self.stop_gently_task = None
 
-        # data for event topics
-        self.m3State_data = self.evt_m3State.DataType()
-        self.elevationInPosition_data = self.evt_elevationInPosition.DataType()
-        self.azimuthInPosition_data = self.evt_azimuthInPosition.DataType()
-        self.nasmyth1RotatorInPosition_data = self.evt_nasmyth1RotatorInPosition.DataType()
-        self.nasmyth2RotatorInPosition_data = self.evt_nasmyth2RotatorInPosition.DataType()
-        self.m3InPosition_data = self.evt_m3InPosition.DataType()
-        self.allAxesInPosition_data = self.evt_allAxesInPosition.DataType()
-        self.azimuthLimitSwitchCCW_data = self.evt_azimuthLimitSwitchCCW.DataType()
-        self.elevationLimitSwitchUpper_data = self.evt_elevationLimitSwitchUpper.DataType()
-        self.nasmyth1LimitSwitchCW_data = self.evt_nasmyth1LimitSwitchCW.DataType()
-        self.nasmyth2LimitSwitchCCW_data = self.evt_nasmyth2LimitSwitchCCW.DataType()
-        self.azimuthBrake1_data = self.evt_azimuthBrake1.DataType()
-        self.azimuthBrake2_data = self.evt_azimuthBrake2.DataType()
-        self.elevationBrake_data = self.evt_elevationBrake.DataType()
-        self.nasmyth1Brake_data = self.evt_nasmyth1Brake.DataType()
-        self.nasmyth2Brake_data = self.evt_nasmyth2Brake.DataType()
-        self.azimuthToppleBlockCCW_data = self.evt_azimuthToppleBlockCCW.DataType()
-        self.nasmyth1LimitSwitchCCW_data = self.evt_nasmyth1LimitSwitchCCW.DataType()
-        self.azimuthToppleBockCW_data = self.evt_azimuthToppleBlockCW.DataType()
-        self.nasmyth2LimitSwitchCW_data = self.evt_nasmyth2LimitSwitchCW.DataType()
-        self.azimuthLimitSwitchCW_data = self.evt_azimuthLimitSwitchCW.DataType()
-        self.azimuthDrive1Status_data = self.evt_azimuthDrive1Status.DataType()
-        self.azimuthDrive2Status_data = self.evt_azimuthDrive2Status.DataType()
-        self.elevationDriveStatus_data = self.evt_elevationDriveStatus.DataType()
-        self.nasmyth1DriveStatus_data = self.evt_nasmyth1DriveStatus.DataType()
-        self.nasmyth2DriveStatus_data = self.evt_nasmyth2DriveStatus.DataType()
-        self.m3DriveStatus_data = self.evt_m3DriveStatus.DataType()
-        self.elevationLimitsSwitchLower_data = self.evt_elevationLimitSwitchLower.DataType()
-        self.atMountState_data = self.evt_atMountState.DataType()
-        self.m3RotatorLimitSwitchCW_data = self.evt_m3RotatorLimitSwitchCW.DataType()
-        self.m3RotatorLimitSwitchCCW_data = self.evt_m3RotatorLimitSwitchCCW.DataType()
-        self.m3RotatorDetentLimitSwitch_data = self.evt_m3RotatorDetentLimitSwitch.DataType()
-        self.m3PortSelected_data = self.evt_m3PortSelected.DataType()
+        # Event topics are:
+        # m3State_data
+        # elevationInPosition_data
+        # azimuthInPosition_data
+        # nasmyth1RotatorInPosition_data
+        # nasmyth2RotatorInPosition_data
+        # m3InPosition_data
+        # allAxesInPosition_data
+        # azimuthLimitSwitchCCW_data
+        # elevationLimitSwitchUpper_data
+        # nasmyth1LimitSwitchCW_data
+        # nasmyth2LimitSwitchCCW_data
+        # azimuthBrake1_data
+        # azimuthBrake2_data
+        # elevationBrake_data
+        # nasmyth1Brake_data
+        # nasmyth2Brake_data
+        # azimuthToppleBlockCCW_data
+        # nasmyth1LimitSwitchCCW_data
+        # azimuthToppleBockCW_data
+        # nasmyth2LimitSwitchCW_data
+        # azimuthLimitSwitchCW_data
+        # azimuthDrive1Status_data
+        # azimuthDrive2Status_data
+        # elevationDriveStatus_data
+        # nasmyth1DriveStatus_data
+        # nasmyth2DriveStatus_data
+        # m3DriveStatus_data
+        # elevationLimitsSwitchLower_data
+        # atMountState_data
+        # m3RotatorLimitSwitchCW_data
+        # m3RotatorLimitSwitchCCW_data
+        # m3RotatorDetentLimitSwitch_data
+        # m3PortSelected_data
 
         # data for telemetry topics
         self.mountEncoders_data = self.tel_mountEncoders.DataType()
@@ -456,15 +456,11 @@ class ATMCSCsc(salobj.BaseCsc):
             self.set_event_field("azimuthToppleBockCCW", "active", False)
             self.set_event_field("azimuthToppleBockCW", "active", False)
 
-        # Handle M3 detent switch
+        # Handle M3 detent switch; field order must match index order in port_az
+        detent_fields = ("nasmyth1DetentActive", "nasmyth2DetentActive", "port3DetentActive")
         at_port = [abs(curr_pos[Axis.M3] - az) < self.m3_detent_range for az in self.port_az]
-        did_change = False
-        # field order must match the port order in ``port_az``
-        for i, field in enumerate(("nasmyth1DetentActive", "nasmyth2DetentActive", "port3DetentActive")):
-            did_change |= getattr(self.m3RotatorDetentLimitSwitch_data, field) != at_port[i]
-            setattr(self.m3RotatorDetentLimitSwitch_data, field, at_port[i])
-        if did_change:
-            self.evt_m3RotatorDetentLimitSwitch.put(self.m3RotatorDetentLimitSwitch_data)
+        detent_dict = dict((detent_fields[i], at_port[i]) for i in range(3))
+        self.set_event_fields("m3RotatorDetentLimitSwitch", **detent_dict)
 
         # Handle "in position" events, including ``allAxesInPosition``
         if not self.tracking_enabled:
@@ -539,11 +535,12 @@ class ATMCSCsc(salobj.BaseCsc):
         value : `any`
             Value for the specified value
         """
-        data = self.getattr(f"{evt_name}_data")
+        self.set_event_fields(evt_name, **{field_name: value})
+
+    def set_event_fields(self, evt_name, **kwargs):
         evt = self.getattr(f"evt_{evt_name}")
-        if not self._initialized or value != getattr(data, field_name):
-            setattr(data, field_name, value)
-            evt.put(data)
+        force_put = not self._initialized
+        evt.set_fields(force_put=force_put, **kwargs)
 
     def report_summary_state(self):
         super().report_summary_state()
