@@ -1,13 +1,9 @@
 .sconsign.dblite
-config.log
 .sconf_temp
-*.o
-*.os
-*.so
 *.cfgc
 *.pyc
-*_wrap.cc
-*Lib.py
+config.log
+ospl-info.log
 
 # Built by sconsUtils
 version.py
