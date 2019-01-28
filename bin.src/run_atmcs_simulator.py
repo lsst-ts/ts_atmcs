@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # This file is part of ts_ATMCSSimulator.
 #
 # Developed for the LSST Data Management System.
@@ -16,8 +17,9 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+import asyncio
 
-import pkgutil, lsstimport
-__path__ = pkgutil.extend_path(__path__, __name__)
+from lsst.ts import ATMCSSimulator
+
+csc = ATMCSSimulator.ATMCSCsc.main(index=0)
+asyncio.get_event_loop().run_until_complete(csc.done_task)
