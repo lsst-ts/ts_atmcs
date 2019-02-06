@@ -77,7 +77,7 @@ class CscTestCase(unittest.TestCase):
             "m3InPosition",
         )
 
-    def xtest_initial_info(self):
+    def test_initial_info(self):
         """Check that all events and telemetry are output at startup
 
         except the m3PortSelected event
@@ -142,7 +142,7 @@ class CscTestCase(unittest.TestCase):
 
         asyncio.get_event_loop().run_until_complete(doit())
 
-    def xtest_standard_state_transitions(self):
+    def test_standard_state_transitions(self):
         """Test standard CSC state transitions.
         """
         async def doit():
@@ -198,7 +198,7 @@ class CscTestCase(unittest.TestCase):
 
         asyncio.get_event_loop().run_until_complete(doit())
 
-    def xtest_set_instrument_port(self):
+    def test_set_instrument_port(self):
         async def doit():
             harness = Harness(initial_state=salobj.State.ENABLED)
             harness.csc.configure(
@@ -237,7 +237,7 @@ class CscTestCase(unittest.TestCase):
 
         asyncio.get_event_loop().run_until_complete(doit())
 
-    def xtest_track(self):
+    def test_track(self):
         async def doit():
             harness = Harness(initial_state=salobj.State.ENABLED)
             harness.csc.configure(
@@ -340,7 +340,7 @@ class CscTestCase(unittest.TestCase):
 
         asyncio.get_event_loop().run_until_complete(doit())
 
-    def xtest_stop_tracking(self):
+    def test_stop_tracking(self):
         """Call stopTracking before a slew is done.
         """
         async def doit():
@@ -393,7 +393,7 @@ class CscTestCase(unittest.TestCase):
 
         asyncio.get_event_loop().run_until_complete(doit())
 
-    def xtest_disable_while_tracking(self):
+    def test_disable_while_tracking(self):
         """Call disable before a slew is done.
         """
         async def doit():
