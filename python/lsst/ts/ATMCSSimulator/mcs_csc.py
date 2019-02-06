@@ -391,19 +391,17 @@ class ATMCSCsc(salobj.BaseCsc):
         * ``m3State``
         * (``m3PortSelected`` is output by ``do_setInstrumentPort``)
 
-        * ``azimuthDrive1Status``
-        * ``azimuthDrive2Status``
-        * ``elevationDriveStatus``
-        * ``nasmyth1DriveStatus``
-        * ``nasmyth2DriveStatus``
-        * ``m3DriveStatus``
-
         * ``elevationInPosition``
         * ``azimuthInPosition``
         * ``nasmyth1RotatorInPosition``
         * ``nasmyth2RotatorInPosition``
         * ``m3InPosition``
         * ``allAxesInPosition``
+
+        * ``azimuthToppleBlockCCW``
+        * ``azimuthToppleBlockCW``
+        * ``azimuthLimitSwitchCW``
+        * ``m3RotatorDetentLimitSwitch``
 
         * ``elevationLimitSwitchLower``
         * ``elevationLimitSwitchUpper``
@@ -414,16 +412,19 @@ class ATMCSCsc(salobj.BaseCsc):
         * ``nasmyth2LimitSwitchCW``
         * ``m3RotatorLimitSwitchCCW``
         * ``m3RotatorLimitSwitchCW``
-        * ``m3RotatorDetentLimitSwitch``
 
+        * ``azimuthDrive1Status``
+        * ``azimuthDrive2Status``
+        * ``elevationDriveStatus``
+        * ``nasmyth1DriveStatus``
+        * ``nasmyth2DriveStatus``
+        * ``m3DriveStatus``
+
+        * ``elevationBrake``
         * ``azimuthBrake1``
         * ``azimuthBrake2``
-        * ``elevationBrake``
         * ``nasmyth1Brake``
         * ``nasmyth2Brake``
-        * ``azimuthToppleBlockCCW``
-        * ``azimuthToppleBlockCW``
-        * ``azimuthLimitSwitchCW``
 
         Report events that have changed,
         and for axes that have run into a limit switch, abort the axis,
