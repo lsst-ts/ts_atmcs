@@ -91,9 +91,9 @@ class ATMCSCsc(salobj.BaseCsc):
         self._stop_gently_task = None
         """Task that runs while axes are slewing to a stop."""
         self._port_info_dict = {
-            SALPY_ATMCS.ATMCS_shared_M3ExitPort_Nasmyth1: (0, SALPY_ATMCS.ATMCS_shared_M3State_Nasmyth1State),
-            SALPY_ATMCS.ATMCS_shared_M3ExitPort_Nasmyth2: (1, SALPY_ATMCS.ATMCS_shared_M3State_Nasmyth2State),
-            SALPY_ATMCS.ATMCS_shared_M3ExitPort_Port3: (2, SALPY_ATMCS.ATMCS_shared_M3State_Port3State),
+            SALPY_ATMCS.ATMCS_shared_M3ExitPort_Nasmyth1: (0, SALPY_ATMCS.ATMCS_shared_M3State_Nasmyth1),
+            SALPY_ATMCS.ATMCS_shared_M3ExitPort_Nasmyth2: (1, SALPY_ATMCS.ATMCS_shared_M3State_Nasmyth2),
+            SALPY_ATMCS.ATMCS_shared_M3ExitPort_Port3: (2, SALPY_ATMCS.ATMCS_shared_M3State_Port3),
         }
         """Dict of port enum: (port_az index, M3State enum constant)"""
 
@@ -460,7 +460,7 @@ class ATMCSCsc(salobj.BaseCsc):
         # Handle brakes
         for axis in Axis:
             for brake_name in self._brake_names[axis]:
-                self.set_event(brake_name, engage=self._axis_braked[axis])
+                self.set_event(brake_name, engaged=self._axis_braked[axis])
 
         # Handle drive status (which means enabled)
         for axis in Axis:
@@ -470,11 +470,11 @@ class ATMCSCsc(salobj.BaseCsc):
         # Handle atMountState
         if self.summary_state == salobj.State.ENABLED:
             if self._tracking_enabled:
-                mount_state = SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingEnabledState
+                mount_state = SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingEnabled
             elif self._stop_gently_task and not self._stop_gently_task.done():
-                mount_state = SALPY_ATMCS.ATMCS_shared_AtMountState_StoppingState
+                mount_state = SALPY_ATMCS.ATMCS_shared_AtMountState_Stopping
             else:
-                mount_state = SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabledState
+                mount_state = SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabled
         else:
             mount_state = self.summary_state
         self.evt_atMountState.set_put(state=mount_state)
@@ -518,7 +518,7 @@ class ATMCSCsc(salobj.BaseCsc):
             self.evt_allAxesInPosition.set_put(inPosition=all_in_position)
 
         # compute m3_basic_state for use setting m3State.state
-        # and m3RotatorDetentLimitSwitch; it has the same value as
+        # and m3RotatorDetentSwitches; it has the same value as
         # m3State.state except that it ignores summary state
         m3_basic_state = None
         if m3_in_position:
@@ -530,11 +530,11 @@ class ATMCSCsc(salobj.BaseCsc):
                     break
             else:
                 # Move is finished, but not at a known point
-                m3_basic_state = SALPY_ATMCS.ATMCS_shared_M3State_UnknownPositionState
+                m3_basic_state = SALPY_ATMCS.ATMCS_shared_M3State_UnknownPosition
         elif m3actuator.kind(t) == path.Kind.Slewing:
-            m3_basic_state = SALPY_ATMCS.ATMCS_shared_M3State_InMotionState
+            m3_basic_state = SALPY_ATMCS.ATMCS_shared_M3State_InMotion
         else:
-            m3_basic_state = SALPY_ATMCS.ATMCS_shared_M3State_UnknownPositionState
+            m3_basic_state = SALPY_ATMCS.ATMCS_shared_M3State_UnknownPosition
         assert m3_basic_state is not None
 
         # handle m3State
@@ -545,13 +545,13 @@ class ATMCSCsc(salobj.BaseCsc):
 
         # Handle M3 detent switch
         detent_map = {
-            SALPY_ATMCS.ATMCS_shared_M3State_Nasmyth1State: "nasmyth1DetentActive",
-            SALPY_ATMCS.ATMCS_shared_M3State_Nasmyth2State: "nasmyth2DetentActive",
-            SALPY_ATMCS.ATMCS_shared_M3State_Port3State: "port3DetentActive",
+            SALPY_ATMCS.ATMCS_shared_M3State_Nasmyth1: "nasmyth1Active",
+            SALPY_ATMCS.ATMCS_shared_M3State_Nasmyth2: "nasmyth2Active",
+            SALPY_ATMCS.ATMCS_shared_M3State_Port3: "port3Active",
         }
         at_field = detent_map.get(m3_basic_state, None)
         detent_values = dict((field_name, field_name == at_field) for field_name in detent_map.values())
-        self.evt_m3RotatorDetentLimitSwitch.set_put(**detent_values)
+        self.evt_m3RotatorDetentSwitches.set_put(**detent_values)
 
     def disable_tracking(self, gently):
         """Disable tracking.

@@ -120,12 +120,12 @@ class CscTestCase(unittest.TestCase):
             self.assertEqual(state.summaryState, salobj.State.ENABLED)
 
             data = await harness.next_evt("atMountState")
-            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabledState)
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabled)
 
             await harness.remote.cmd_startTracking.start(timeout=2)
 
             data = await harness.next_evt("atMountState", timeout=1)
-            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingEnabledState)
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingEnabled)
 
             # specify a target that is in bounds at the specified time
             # but out of bounds at the current time
@@ -138,7 +138,7 @@ class CscTestCase(unittest.TestCase):
                 await harness.remote.cmd_trackTarget.start(timeout=1)
 
             data = await harness.next_evt("atMountState")
-            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabledState)
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabled)
 
         asyncio.get_event_loop().run_until_complete(doit())
 
@@ -209,7 +209,7 @@ class CscTestCase(unittest.TestCase):
             self.assertEqual(state.summaryState, salobj.State.ENABLED)
 
             data = await harness.next_evt("m3State")
-            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_M3State_Nasmyth1State)
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_M3State_Nasmyth1)
 
             harness.remote.cmd_setInstrumentPort.set(port=SALPY_ATMCS.ATMCS_shared_M3ExitPort_Port3)
             await harness.remote.cmd_setInstrumentPort.start(timeout=2)
@@ -217,7 +217,7 @@ class CscTestCase(unittest.TestCase):
             data = await harness.next_evt("m3PortSelected")
             self.assertEqual(data.selected, SALPY_ATMCS.ATMCS_shared_M3ExitPort_Port3)
             data = await harness.next_evt("m3State")
-            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_M3State_InMotionState)
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_M3State_InMotion)
 
             t0 = time.time()
 
@@ -233,7 +233,7 @@ class CscTestCase(unittest.TestCase):
 
             data = await harness.next_evt("m3State", timeout=5)
             print(f"test_set_instrument_port M3 rotation took {time.time() - t0:0.2f} sec")
-            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_M3State_Port3State)
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_M3State_Port3)
 
         asyncio.get_event_loop().run_until_complete(doit())
 
@@ -248,11 +248,11 @@ class CscTestCase(unittest.TestCase):
             self.assertEqual(state.summaryState, salobj.State.ENABLED)
 
             data = await harness.next_evt("atMountState")
-            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabledState)
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabled)
 
             for evt_name in self.brake_names:
                 data = await harness.next_evt(evt_name)
-                self.assertTrue(data.engage)
+                self.assertTrue(data.engaged)
 
             for evt_name in self.enable_names:
                 data = await harness.next_evt(evt_name)
@@ -274,11 +274,11 @@ class CscTestCase(unittest.TestCase):
             await harness.remote.cmd_startTracking.start(timeout=2)
 
             data = await harness.next_evt("atMountState")
-            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingEnabledState)
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingEnabled)
 
             for evt_name in self.brake_names:
                 data = await harness.next_evt(evt_name)
-                self.assertFalse(data.engage)
+                self.assertFalse(data.engaged)
 
             for evt_name in self.enable_names:
                 data = await harness.next_evt(evt_name)
