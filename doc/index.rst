@@ -8,7 +8,7 @@ lsst.ts.ATMCSSimulator
 
 A simulator for the auxiliary telescope motor control system (ATMCS CSC).
 
-.. .. _lsst.ts.ATMCSSimulator-using:
+.. _lsst.ts.ATMCSSimulator-using:
 
 Using lsst.ts.ATMCSSimulator
 ============================
@@ -19,7 +19,7 @@ Assuming you have the basic LSST DM stack installed you can do the following, fr
 * ``setup -r .`` to setup the package and dependencies.
 * ``scons`` to build the package and run unit tests.
 * ``scons install declare`` to install the package and declare it to eups.
-* `package-docs build` to build the documentation.
+* ``package-docs build`` to build the documentation.
   This requires ``documenteer``; see `building single package docs`_ for installation instructions.
 
 .. _building single package docs: https://developer.lsst.io/stack/building-single-package-docs.html
