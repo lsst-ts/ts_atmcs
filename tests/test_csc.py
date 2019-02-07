@@ -154,6 +154,14 @@ class CscTestCase(unittest.TestCase):
             state = await harness.remote.evt_summaryState.next(flush=False, timeout=2)
             self.assertEqual(state.summaryState, salobj.State.STANDBY)
 
+            for evt_name in self.brake_names:
+                data = await harness.next_evt(evt_name)
+                self.assertTrue(data.engaged)
+
+            for evt_name in self.enable_names:
+                data = await harness.next_evt(evt_name)
+                self.assertFalse(data.enable)
+
             # send start; new state is DISABLED
             id_ack = await harness.remote.cmd_start.start()
             self.assertEqual(id_ack.ack.ack, harness.remote.salinfo.lib.SAL__CMD_COMPLETE)
@@ -170,6 +178,14 @@ class CscTestCase(unittest.TestCase):
             state = await harness.remote.evt_summaryState.next(flush=False, timeout=2)
             self.assertEqual(state.summaryState, salobj.State.ENABLED)
 
+            for evt_name in self.brake_names:
+                data = await harness.next_evt(evt_name)
+                self.assertFalse(data.engaged)
+
+            for evt_name in self.enable_names:
+                data = await harness.next_evt(evt_name)
+                self.assertTrue(data.enable)
+
             # send disable; new state is DISABLED
             id_ack = await harness.remote.cmd_disable.start()
             self.assertEqual(id_ack.ack.ack, harness.remote.salinfo.lib.SAL__CMD_COMPLETE)
@@ -177,6 +193,14 @@ class CscTestCase(unittest.TestCase):
             self.assertEqual(harness.csc.summary_state, salobj.State.DISABLED)
             state = await harness.remote.evt_summaryState.next(flush=False, timeout=2)
             self.assertEqual(state.summaryState, salobj.State.DISABLED)
+
+            for evt_name in self.brake_names:
+                data = await harness.next_evt(evt_name)
+                self.assertTrue(data.engaged)
+
+            for evt_name in self.enable_names:
+                data = await harness.next_evt(evt_name)
+                self.assertFalse(data.enable)
 
             # send standby; new state is STANDBY
             id_ack = await harness.remote.cmd_standby.start()
@@ -250,17 +274,6 @@ class CscTestCase(unittest.TestCase):
             data = await harness.next_evt("atMountState")
             self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabled)
 
-            for evt_name in self.brake_names:
-                data = await harness.next_evt(evt_name)
-                self.assertTrue(data.engaged)
-
-            for evt_name in self.enable_names:
-                data = await harness.next_evt(evt_name)
-                if evt_name.startswith("m3"):
-                    self.assertTrue(data.enable)
-                else:
-                    self.assertFalse(data.enable)
-
             for evt_name in self.in_position_names:
                 data = await harness.next_evt(evt_name)
                 if evt_name.startswith("m3"):
@@ -275,17 +288,6 @@ class CscTestCase(unittest.TestCase):
 
             data = await harness.next_evt("atMountState")
             self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingEnabled)
-
-            for evt_name in self.brake_names:
-                data = await harness.next_evt(evt_name)
-                self.assertFalse(data.engaged)
-
-            for evt_name in self.enable_names:
-                data = await harness.next_evt(evt_name)
-                if evt_name.startswith("m3"):
-                    self.assertFalse(data.enable)
-                else:
-                    self.assertTrue(data.enable)
 
             # attempts to set instrument port should fail
             with salobj.assertRaisesAckError():
@@ -330,13 +332,6 @@ class CscTestCase(unittest.TestCase):
                 self.assertTrue(data.inPosition)
 
             await harness.remote.cmd_stopTracking.start(timeout=1)
-
-            for evt_name in self.enable_names:
-                data = await harness.next_evt(evt_name)
-                if evt_name.startswith("m3"):
-                    self.assertTrue(data.enable)
-                else:
-                    self.assertFalse(data.enable)
 
         asyncio.get_event_loop().run_until_complete(doit())
 
@@ -384,13 +379,6 @@ class CscTestCase(unittest.TestCase):
                 else:
                     self.assertFalse(data.inPosition)
 
-            for evt_name in self.enable_names:
-                data = harness.get_evt(evt_name)
-                if evt_name.startswith("m3"):
-                    self.assertTrue(data.enable)
-                else:
-                    self.assertFalse(data.enable)
-
         asyncio.get_event_loop().run_until_complete(doit())
 
     def test_disable_while_tracking(self):
@@ -436,10 +424,6 @@ class CscTestCase(unittest.TestCase):
                     self.assertTrue(data.inPosition)
                 else:
                     self.assertFalse(data.inPosition)
-
-            for evt_name in self.enable_names:
-                data = harness.get_evt(evt_name)
-                self.assertFalse(data.enable)
 
         asyncio.get_event_loop().run_until_complete(doit())
 

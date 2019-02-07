@@ -172,7 +172,6 @@ class ATMCSCsc(salobj.BaseCsc):
         """
 
         self.configure()
-        self.initialize()
 
     def configure(self,
                   max_tracking_interval=1,
@@ -289,10 +288,6 @@ class ATMCSCsc(salobj.BaseCsc):
             raise salobj.ExpectedError("Cannot startTracking until M3 is at a known position")
         if self._stop_gently_task and not self._stop_gently_task.done():
             raise salobj.ExpectedError("stopTracking not finished yet")
-        for axis in MainAxes:
-            self._axis_enabled[axis] = True
-            self._axis_braked[axis] = False
-        self._axis_enabled[Axis.M3] = False
         self._tracking_enabled = True
         self.update_events()
 
@@ -347,10 +342,6 @@ class ATMCSCsc(salobj.BaseCsc):
         self._stop_gently_task = asyncio.ensure_future(self.stop_gently())
         await self._stop_gently_task
         self._stop_gently_task = None
-
-    def initialize(self):
-        self.disable_tracking(gently=False)
-        self.update_events()
 
     async def kill_tracking(self):
         """Wait ``self.max_tracking_interval`` seconds and disable tracking.
@@ -554,7 +545,7 @@ class ATMCSCsc(salobj.BaseCsc):
         self.evt_m3RotatorDetentSwitches.set_put(**detent_values)
 
     def disable_tracking(self, gently):
-        """Disable tracking.
+        """Disable tracking and call update_events.
 
         Parameters
         ----------
@@ -563,22 +554,10 @@ class ATMCSCsc(salobj.BaseCsc):
             If False then abort the axis and apply the brake.
         """
         for axis in MainAxes:
-            self._axis_enabled[axis] = False
             if gently:
                 self.actuators[axis].stop()
             else:
                 self.actuators[axis].abort()
-                self._axis_enabled[axis] = False
-                self._axis_braked[axis] = True
-
-        if self.summary_state == salobj.State.ENABLED:
-            self._axis_enabled[Axis.M3] = True
-        else:
-            self._axis_enabled[Axis.M3] = False
-            if gently:
-                self.actuators[Axis.M3].stop()
-            else:
-                self.actuators[Axis.M3].abort()
 
         self._tracking_enabled = False
         self.update_events()
@@ -603,10 +582,24 @@ class ATMCSCsc(salobj.BaseCsc):
 
     def report_summary_state(self):
         super().report_summary_state()
+        update_other_events = False
         if self.summary_state in (salobj.State.DISABLED, salobj.State.ENABLED):
             asyncio.ensure_future(self.telemetry_loop())
-        if self.summary_state != salobj.State.ENABLED:
+        if self.summary_state == salobj.State.ENABLED:
+            for axis in Axis:
+                self._axis_enabled[axis] = True
+                self._axis_braked[axis] = False
+            update_other_events = True
+        else:
+            for axis in Axis:
+                self._axis_enabled[axis] = False
+                self._axis_braked[axis] = True
+            # this calls update_events so no need to do it twice
             self.disable_tracking(gently=False)
+        if self.summary_state in (salobj.State.DISABLED, salobj.State.ENABLED):
+            asyncio.ensure_future(self.telemetry_loop())
+        elif update_other_events:
+            self.update_events()
 
     async def telemetry_loop(self):
         """Output telemetry and events that have changed
