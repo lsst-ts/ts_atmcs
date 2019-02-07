@@ -171,7 +171,9 @@ class ATMCSCsc(salobj.BaseCsc):
         """Timer to kill tracking if trackTarget doesn't arrive in time.
         """
 
+        self._telemetry_task = None
         self.configure()
+        # note: initial events are output by report_summary_state
 
     def configure(self,
                   max_tracking_interval=1,
@@ -296,13 +298,22 @@ class ATMCSCsc(salobj.BaseCsc):
         if not self._tracking_enabled:
             raise salobj.ExpectedError("Cannot trackTarget until tracking is enabled")
         data = id_data.data
-        pos = np.array([data.elevation, data.azimuth,
-                        data.nasmyth1RotatorAngle, data.nasmyth2RotatorAngle], dtype=float)
-        vel = np.array([data.elevationVelocity, data.azimuthVelocity,
-                       data.nasmyth1RotatorAngleVelocity, data.nasmyth2RotatorAngleVelocity], dtype=float)
-        dt = time.time() - data.time
-        curr_pos = pos + dt*vel
         try:
+            if data.azimuthDirection == SALPY_ATMCS.ATMCS_shared_AzimuthDirection_ClockWise:
+                wrap_pos = True
+            elif data.azimuthDirection == SALPY_ATMCS.ATMCS_shared_AzimuthDirection_CounterClockWise:
+                wrap_pos = False
+            else:
+                raise salobj.ExpectedError(f"azimuthDirection={data.azimuthDirection}; must be 1 or 2")
+            pos = np.array([data.elevation, data.azimuth,
+                            data.nasmyth1RotatorAngle, data.nasmyth2RotatorAngle], dtype=float)
+            if not 0 <= pos[1] <= 360:
+                raise salobj.ExpectedError(f"azimuth={data.azimuth}; must be in range 0 - 360")
+            pos[1] = path.wrap_angle(pos[1], wrap_pos, self.pmin_cmd[1], self.pmax_cmd[1])
+            vel = np.array([data.elevationVelocity, data.azimuthVelocity,
+                           data.nasmyth1RotatorAngleVelocity, data.nasmyth2RotatorAngleVelocity], dtype=float)
+            dt = time.time() - data.time
+            curr_pos = pos + dt*vel
             if np.any(curr_pos < self.pmin_cmd[0:4]) or np.any(curr_pos > self.pmax_cmd[0:4]):
                 raise salobj.ExpectedError(f"One or more target positions {curr_pos} not in range "
                                            f"{self.pmin_cmd} to {self.pmax_cmd} at the current time")
@@ -582,24 +593,20 @@ class ATMCSCsc(salobj.BaseCsc):
 
     def report_summary_state(self):
         super().report_summary_state()
-        update_other_events = False
-        if self.summary_state in (salobj.State.DISABLED, salobj.State.ENABLED):
-            asyncio.ensure_future(self.telemetry_loop())
         if self.summary_state == salobj.State.ENABLED:
             for axis in Axis:
                 self._axis_enabled[axis] = True
                 self._axis_braked[axis] = False
-            update_other_events = True
         else:
             for axis in Axis:
                 self._axis_enabled[axis] = False
                 self._axis_braked[axis] = True
-            # this calls update_events so no need to do it twice
+            # disable_tracking calls update_events, so even if summary state
+            # isn't DISABLED (in which case the telemetry loop will not run)
+            # the state will be output
             self.disable_tracking(gently=False)
         if self.summary_state in (salobj.State.DISABLED, salobj.State.ENABLED):
             asyncio.ensure_future(self.telemetry_loop())
-        elif update_other_events:
-            self.update_events()
 
     async def telemetry_loop(self):
         """Output telemetry and events that have changed
@@ -616,6 +623,8 @@ class ATMCSCsc(salobj.BaseCsc):
 
         See `update_events` for the events that are output.
         """
+        if self._telemetry_task is not None and not self._telemetry_task.done():
+            self._telemetry_task.cancel()
         while self.summary_state in (salobj.State.DISABLED, salobj.State.ENABLED):
             # update events first so that limits are handled
             self.update_events()
@@ -684,4 +693,5 @@ class ATMCSCsc(salobj.BaseCsc):
                 nasmyth1EncoderRaw=motor_encoder_counts[Axis.NA1],
                 nasmyth2EncoderRaw=motor_encoder_counts[Axis.NA2],
             )
-            await asyncio.sleep(self.telemetry_interval)
+            self._telemetry_task = asyncio.ensure_future(asyncio.sleep(self.telemetry_interval))
+            await self._telemetry_task
