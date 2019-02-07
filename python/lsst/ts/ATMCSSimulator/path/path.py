@@ -19,10 +19,13 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-__all__ = ["Kind", "TPVAJ", "Path"]
+__all__ = ["Kind", "TPVAJ", "Path", "wrap_angle"]
 
 import bisect
 import enum
+
+from astropy.coordinates import Angle
+import astropy.units as u
 
 
 class Kind(enum.Enum):
@@ -125,3 +128,31 @@ class Path:
     def __repr__(self):
         tpvajs_str = ", ".join(repr(tpvaj) for tpvaj in self.tpvajs[:-1])
         return f"Path({tpvajs_str}, kind={self.kind})"
+
+
+def wrap_angle(angle, wrap_pos, min_angle, max_angle):
+    """Given an angle, limits and wrap, output the wrapped angle.
+
+    Parameters
+    ----------
+    angle : `float`
+        Angle in degrees
+    min_angle : `float`
+        Minimum allowed angle, in degrees (inclusive)
+    max_angle : `float`
+        Maximum allowed angle, in degrees (inclusive)
+    wrap_pos : `boolean`
+        If True then wrap the angle positive, else negative.
+
+    Raises
+    ------
+    ValueError
+        If max_angle - min_angle <= 360
+    """
+    if max_angle - min_angle <= 360:
+        raise ValueError(f"max_angle {max_angle} - min_angle {min_angle} = {max_angle - min_angle} <= 360")
+    if wrap_pos:
+        max_wrapped = Angle(max_angle, u.deg)
+    else:
+        max_wrapped = Angle(min_angle + 360, u.deg)
+    return Angle(angle, u.deg).wrap_at(max_wrapped).deg
