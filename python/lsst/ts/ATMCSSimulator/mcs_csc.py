@@ -419,19 +419,21 @@ class ATMCSCsc(salobj.BaseCsc):
         for axis in Axis:
             self._axis_enabled[axis] = False
             self._axis_braked[axis] = True
-        self.update_events()
+        asyncio.ensure_future(self._run_update_events())
 
     async def _finish_stop_tracking(self):
         """Wait for the main axes to stop.
         """
-        try:
-            end_times = [self.actuators[axis].curr[-1].t0 for axis in MainAxes]
-            max_end_time = max(end_times)
-            dt = 0.1 + max_end_time - time.time()
-            if dt > 0:
-                await asyncio.sleep(dt)
-        finally:
-            self.update_events()
+        end_times = [self.actuators[axis].curr[-1].t0 for axis in MainAxes]
+        max_end_time = max(end_times)
+        dt = 0.1 + max_end_time - time.time()
+        if dt > 0:
+            await asyncio.sleep(dt)
+        asyncio.ensure_future(self._run_update_events())
+
+    async def _run_update_events(self):
+        await asyncio.sleep(0)
+        self.update_events()
 
     def update_events(self):
         """Set state of the various events.
@@ -523,7 +525,8 @@ class ATMCSCsc(salobj.BaseCsc):
         # Handle atMountState
         if self._tracking_enabled:
             mount_state = SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingEnabled
-        elif self._stop_tracking_task and not self._stop_tracking_task.done():
+        elif (self._stop_tracking_task is not None and not self._stop_tracking_task.done()) \
+                or (self._disable_all_drives_task is not None and not self._disable_all_drives_task.done()):
             mount_state = SALPY_ATMCS.ATMCS_shared_AtMountState_Stopping
         else:
             mount_state = SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabled

@@ -178,6 +178,8 @@ class Actuator:
         - if self.curr.kind is stopping and t > start time of last segment,
           the kind is reported as stopped.
         """
+        if t is None:
+            t = time.time()
         if self.curr.kind == path.Kind.Tracking:
             if self._ntrack > self.nsettle:
                 return path.Kind.Tracking

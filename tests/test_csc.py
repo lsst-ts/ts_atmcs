@@ -40,14 +40,14 @@ class Harness:
             evt = getattr(self.remote, f"evt_{name}")
             return await evt.next(flush=flush, timeout=timeout)
         except Exception as e:
-            raise RuntimeError(f"Cound not get data for event {name}") from e
+            raise RuntimeError(f"Could not get data for event {name}") from e
 
     def get_evt(self, name):
         try:
             evt = getattr(self.remote, f"evt_{name}")
             return evt.get()
         except Exception as e:
-            raise RuntimeError(f"Cound not get data for event {name}") from e
+            raise RuntimeError(f"Could not get data for event {name}") from e
 
 
 class CscTestCase(unittest.TestCase):
@@ -159,6 +159,8 @@ class CscTestCase(unittest.TestCase):
             with salobj.assertRaisesAckError():
                 await harness.remote.cmd_trackTarget.start(timeout=1)
             data = await harness.next_evt("atMountState")
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_Stopping)
+            data = await harness.next_evt("atMountState", 2)
             self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabled)
             await self.fault_to_enabled(harness)
 
@@ -460,19 +462,26 @@ class CscTestCase(unittest.TestCase):
 
             # wait too long for trackTarget
             data = await harness.next_evt("atMountState", timeout=max_tracking_interval + 0.2)
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_Stopping)
+
+            data = await harness.next_evt("atMountState", timeout=2)
             self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabled)
 
         asyncio.get_event_loop().run_until_complete(doit())
 
-    def test_stop_tracking(self):
-        """Call stopTracking before a slew is done.
+    def test_stop_tracking_while_slewing(self):
+        """Call stopTracking while tracking, before a slew is done.
         """
         async def doit():
             harness = Harness(initial_state=salobj.State.ENABLED)
             state = await harness.remote.evt_summaryState.next(flush=False, timeout=5)
             self.assertEqual(state.summaryState, salobj.State.ENABLED)
+            data = await harness.next_evt("atMountState")
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabled)
 
             await harness.remote.cmd_startTracking.start(timeout=2)
+            data = await harness.next_evt("atMountState")
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingEnabled)
 
             t0 = time.time()
             paths = dict(
@@ -499,6 +508,8 @@ class CscTestCase(unittest.TestCase):
             await asyncio.sleep(0.2)
 
             await harness.remote.cmd_stopTracking.start(timeout=1)
+            data = await harness.next_evt("atMountState")
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_Stopping)
 
             await asyncio.sleep(0.2)  # give events time to arrive
 
@@ -509,17 +520,27 @@ class CscTestCase(unittest.TestCase):
                 else:
                     self.assertFalse(data.inPosition)
 
+            data = await harness.next_evt("atMountState", timeout=2)
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabled)
+
+            for actuator in harness.csc.actuators:
+                self.assertEqual(actuator.kind(), ATMCSSimulator.path.Kind.Stopped)
+
         asyncio.get_event_loop().run_until_complete(doit())
 
-    def test_disable_while_tracking(self):
-        """Call disable before a slew is done.
+    def test_disable_while_slewing(self):
+        """Call disable while tracking, before a slew is done.
         """
         async def doit():
             harness = Harness(initial_state=salobj.State.ENABLED)
             state = await harness.remote.evt_summaryState.next(flush=False, timeout=5)
             self.assertEqual(state.summaryState, salobj.State.ENABLED)
+            data = await harness.next_evt("atMountState", timeout=2)
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabled)
 
             await harness.remote.cmd_startTracking.start(timeout=2)
+            data = await harness.next_evt("atMountState", timeout=2)
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingEnabled)
 
             t0 = time.time()
             paths = dict(
@@ -546,6 +567,8 @@ class CscTestCase(unittest.TestCase):
             await asyncio.sleep(0.2)
 
             await harness.remote.cmd_disable.start(timeout=1)
+            data = await harness.next_evt("atMountState", timeout=2)
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_Stopping)
 
             await asyncio.sleep(0.2)  # give events time to arrive
 
@@ -555,6 +578,9 @@ class CscTestCase(unittest.TestCase):
                     self.assertTrue(data.inPosition)
                 else:
                     self.assertFalse(data.inPosition)
+
+            data = await harness.next_evt("atMountState", timeout=2)
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabled)
 
         asyncio.get_event_loop().run_until_complete(doit())
 
