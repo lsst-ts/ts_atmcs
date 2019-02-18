@@ -88,12 +88,16 @@ class ATMCSCsc(salobj.BaseCsc):
                          initial_simulation_mode=initial_simulation_mode)
         self.telemetry_interval = 0.1
         """Interval between telemetry updates (sec)"""
-        self._stop_gently_task = None
-        """Task that runs while axes are slewing to a stop."""
+        self._telemetry_task = None
+        """Task that runs while the telemetry loop sleeps."""
+        self._stop_tracking_task = None
+        """Task that runs while axes are slewing due to stopTracking."""
+        self._disable_all_drives_task = None
+        """Task that runs while axes are halting before being disabled."""
         self._port_info_dict = {
-            SALPY_ATMCS.ATMCS_shared_M3ExitPort_Nasmyth1: (0, SALPY_ATMCS.ATMCS_shared_M3State_Nasmyth1State),
-            SALPY_ATMCS.ATMCS_shared_M3ExitPort_Nasmyth2: (1, SALPY_ATMCS.ATMCS_shared_M3State_Nasmyth2State),
-            SALPY_ATMCS.ATMCS_shared_M3ExitPort_Port3: (2, SALPY_ATMCS.ATMCS_shared_M3State_Port3State),
+            SALPY_ATMCS.ATMCS_shared_M3ExitPort_Nasmyth1: (0, SALPY_ATMCS.ATMCS_shared_M3State_Nasmyth1),
+            SALPY_ATMCS.ATMCS_shared_M3ExitPort_Nasmyth2: (1, SALPY_ATMCS.ATMCS_shared_M3State_Nasmyth2),
+            SALPY_ATMCS.ATMCS_shared_M3ExitPort_Port3: (2, SALPY_ATMCS.ATMCS_shared_M3State_Port3),
         }
         """Dict of port enum: (port_az index, M3State enum constant)"""
 
@@ -172,14 +176,14 @@ class ATMCSCsc(salobj.BaseCsc):
         """
 
         self.configure()
-        self.initialize()
+        # note: initial events are output by report_summary_state
 
     def configure(self,
-                  max_tracking_interval=1,
-                  pmin_cmd=(5, -180, -360, -360, 0),
-                  pmax_cmd=(90, 360, 360, 360, 180),
-                  pmin_lim=(3, -182, -362, -362, -2),
-                  pmax_lim=(92, 362, 362, 362, 182),
+                  max_tracking_interval=2.5,
+                  pmin_cmd=(5, -270, -165, -165, 0),
+                  pmax_cmd=(90, 270, 165, 165, 180),
+                  pmin_lim=(3, -272, -167, -167, -2),
+                  pmax_lim=(92, 272, 167, 167, 182),
                   vmax=(5, 5, 5, 5, 5),
                   amax=(3, 3, 3, 3, 3),
                   topple_az=(2, 5),
@@ -287,42 +291,60 @@ class ATMCSCsc(salobj.BaseCsc):
         self.assert_enabled("startTracking")
         if not self.evt_m3InPosition.data.inPosition:
             raise salobj.ExpectedError("Cannot startTracking until M3 is at a known position")
-        if self._stop_gently_task and not self._stop_gently_task.done():
+        if self._stop_tracking_task and not self._stop_tracking_task.done():
             raise salobj.ExpectedError("stopTracking not finished yet")
-        for axis in MainAxes:
-            self._axis_enabled[axis] = True
-            self._axis_braked[axis] = False
-        self._axis_enabled[Axis.M3] = False
         self._tracking_enabled = True
         self.update_events()
+        self._set_tracking_timer(restart=True)
 
     def do_trackTarget(self, id_data):
         self.assert_enabled("trackTarget")
         if not self._tracking_enabled:
             raise salobj.ExpectedError("Cannot trackTarget until tracking is enabled")
         data = id_data.data
-        pos = np.array([data.elevation, data.azimuth,
-                        data.nasmyth1RotatorAngle, data.nasmyth2RotatorAngle], dtype=float)
-        vel = np.array([data.elevationVelocity, data.azimuthVelocity,
-                       data.nasmyth1RotatorAngleVelocity, data.nasmyth2RotatorAngleVelocity], dtype=float)
-        dt = time.time() - data.time
-        curr_pos = pos + dt*vel
         try:
+            if data.azimuthDirection == SALPY_ATMCS.ATMCS_shared_AzimuthDirection_ClockWise:
+                wrap_pos = True
+            elif data.azimuthDirection == SALPY_ATMCS.ATMCS_shared_AzimuthDirection_CounterClockWise:
+                wrap_pos = False
+            else:
+                raise salobj.ExpectedError(f"azimuthDirection={data.azimuthDirection}; must be 1 or 2")
+            pos = np.array([data.elevation, data.azimuth,
+                            data.nasmyth1RotatorAngle, data.nasmyth2RotatorAngle], dtype=float)
+            if not 0 <= pos[1] <= 360:
+                raise salobj.ExpectedError(f"azimuth={data.azimuth}; must be in range 0 - 360")
+            pos[1] = path.wrap_angle(pos[1], wrap_pos, self.pmin_cmd[1], self.pmax_cmd[1])
+            vel = np.array([data.elevationVelocity, data.azimuthVelocity,
+                           data.nasmyth1RotatorAngleVelocity, data.nasmyth2RotatorAngleVelocity], dtype=float)
+            dt = time.time() - data.time
+            curr_pos = pos + dt*vel
             if np.any(curr_pos < self.pmin_cmd[0:4]) or np.any(curr_pos > self.pmax_cmd[0:4]):
                 raise salobj.ExpectedError(f"One or more target positions {curr_pos} not in range "
                                            f"{self.pmin_cmd} to {self.pmax_cmd} at the current time")
             if np.any(np.abs(vel) > self.vmax[0:4]):
                 raise salobj.ExpectedError(f"Magnitude of one or more target velocities "
                                            f"{vel} > {self.pmax_vel}")
-        except Exception:
-            self.disable_tracking(gently=True)
+        except Exception as e:
+            self.evt_errorCode.set_put(errorCode=1, errorReport=f"trackTarget failed: {e}", force_output=True)
+            self.fault()
             raise
 
         for i in range(4):
             self.actuators[i].set_cmd(pos=pos[i], vel=vel[i], t=data.time)
+        self._set_tracking_timer(restart=True)
+
+    def _set_tracking_timer(self, restart):
+        """Restart or stop the tracking timer.
+
+        Parameters
+        ----------
+        restart : `bool`
+            If True then start or restart the tracking timer, else stop it.
+        """
         if self._kill_tracking_timer and not self._kill_tracking_timer.done():
             self._kill_tracking_timer.cancel()
-        self._kill_tracking_timer = asyncio.ensure_future(self.kill_tracking())
+        if restart:
+            self._kill_tracking_timer = asyncio.ensure_future(self.kill_tracking())
 
     def do_setInstrumentPort(self, id_data):
         self.assert_enabled("setInstrumentPort")
@@ -342,14 +364,15 @@ class ATMCSCsc(salobj.BaseCsc):
 
     async def do_stopTracking(self, id_data):
         self.assert_enabled("stopTracking")
-        if self._stop_gently_task and not self._stop_gently_task.done():
+        if self._stop_tracking_task and not self._stop_tracking_task.done():
             raise salobj.ExpectedError("Already stopping")
-        self._stop_gently_task = asyncio.ensure_future(self.stop_gently())
-        await self._stop_gently_task
-        self._stop_gently_task = None
-
-    def initialize(self):
-        self.disable_tracking(gently=False)
+        self._set_tracking_timer(restart=False)
+        self._tracking_enabled = False
+        for axis in MainAxes:
+            self.actuators[axis].stop()
+        if self._stop_tracking_task is not None and not self._stop_tracking_task.done():
+            self._stop_tracking_task.cancel()
+        self._stop_tracking_task = asyncio.ensure_future(self._finish_stop_tracking())
         self.update_events()
 
     async def kill_tracking(self):
@@ -359,26 +382,58 @@ class ATMCSCsc(salobj.BaseCsc):
         if the next ``trackTarget`` command is not seen quickly enough.
         """
         await asyncio.sleep(self.max_tracking_interval)
-        self.log.error(f"trackTarget not seen in {self.max_tracking_interval} seconds; "
-                       "halt axes and disable tracking")
-        self.disable_tracking(gently=True)
+        self.evt_errorCode.set_put(errorCode=2,
+                                   errorReport=f"trackTarget not seen in {self.max_tracking_interval} sec",
+                                   force_output=True)
+        self.fault()
 
-    async def stop_gently(self):
-        """Stop the axes (but not M3) gently.
-
-        Stop M3 abruptly.
+    def disable_all_drives(self):
+        """Stop all drives, disable them and put on brakes.
         """
-        try:
-            end_times = []
-            for actuator in self.actuators[0:4]:
+        self._tracking_enabled = False
+        already_stopped = True
+        t0 = time.time()
+        for axis in Axis:
+            actuator = self.actuators[axis]
+            if actuator.kind(t0) == path.Kind.Stopped:
+                self._axis_enabled[axis] = False
+                self._axis_braked[axis] = True
+            else:
+                already_stopped = False
                 actuator.stop()
-                end_times.append(actuator.curr[-1].t0)
-            max_end_time = max(end_times)
-            dt = max_end_time - time.time()
-            if dt > 0:
-                await asyncio.sleep(dt)
-        finally:
-            self.disable_tracking(gently=True)
+        if self._disable_all_drives_task is not None and not self._disable_all_drives_task:
+            self._disable_all_drives_task.cancel()
+        if not already_stopped:
+            self._disable_all_drives_task = asyncio.ensure_future(self._finish_disable_all_drives())
+        self.update_events()
+
+    async def _finish_disable_all_drives(self):
+        """Wait for the main axes to stop.
+        """
+        end_times = [actuator.curr[-1].t0 for actuator in self.actuators]
+        max_end_time = max(end_times)
+        # give a bit of margin to be sure the axes are stopped
+        dt = 0.1 + max_end_time - time.time()
+        if dt > 0:
+            await asyncio.sleep(dt)
+        for axis in Axis:
+            self._axis_enabled[axis] = False
+            self._axis_braked[axis] = True
+        asyncio.ensure_future(self._run_update_events())
+
+    async def _finish_stop_tracking(self):
+        """Wait for the main axes to stop.
+        """
+        end_times = [self.actuators[axis].curr[-1].t0 for axis in MainAxes]
+        max_end_time = max(end_times)
+        dt = 0.1 + max_end_time - time.time()
+        if dt > 0:
+            await asyncio.sleep(dt)
+        asyncio.ensure_future(self._run_update_events())
+
+    async def _run_update_events(self):
+        await asyncio.sleep(0)
+        self.update_events()
 
     def update_events(self):
         """Set state of the various events.
@@ -391,19 +446,17 @@ class ATMCSCsc(salobj.BaseCsc):
         * ``m3State``
         * (``m3PortSelected`` is output by ``do_setInstrumentPort``)
 
-        * ``azimuthDrive1Status``
-        * ``azimuthDrive2Status``
-        * ``elevationDriveStatus``
-        * ``nasmyth1DriveStatus``
-        * ``nasmyth2DriveStatus``
-        * ``m3DriveStatus``
-
         * ``elevationInPosition``
         * ``azimuthInPosition``
         * ``nasmyth1RotatorInPosition``
         * ``nasmyth2RotatorInPosition``
         * ``m3InPosition``
         * ``allAxesInPosition``
+
+        * ``azimuthToppleBlockCCW``
+        * ``azimuthToppleBlockCW``
+        * ``azimuthLimitSwitchCW``
+        * ``m3RotatorDetentLimitSwitch``
 
         * ``elevationLimitSwitchLower``
         * ``elevationLimitSwitchUpper``
@@ -414,16 +467,19 @@ class ATMCSCsc(salobj.BaseCsc):
         * ``nasmyth2LimitSwitchCW``
         * ``m3RotatorLimitSwitchCCW``
         * ``m3RotatorLimitSwitchCW``
-        * ``m3RotatorDetentLimitSwitch``
 
+        * ``azimuthDrive1Status``
+        * ``azimuthDrive2Status``
+        * ``elevationDriveStatus``
+        * ``nasmyth1DriveStatus``
+        * ``nasmyth2DriveStatus``
+        * ``m3DriveStatus``
+
+        * ``elevationBrake``
         * ``azimuthBrake1``
         * ``azimuthBrake2``
-        * ``elevationBrake``
         * ``nasmyth1Brake``
         * ``nasmyth2Brake``
-        * ``azimuthToppleBlockCCW``
-        * ``azimuthToppleBlockCW``
-        * ``azimuthLimitSwitchCW``
 
         Report events that have changed,
         and for axes that have run into a limit switch, abort the axis,
@@ -459,7 +515,7 @@ class ATMCSCsc(salobj.BaseCsc):
         # Handle brakes
         for axis in Axis:
             for brake_name in self._brake_names[axis]:
-                self.set_event(brake_name, engage=self._axis_braked[axis])
+                self.set_event(brake_name, engaged=self._axis_braked[axis])
 
         # Handle drive status (which means enabled)
         for axis in Axis:
@@ -467,15 +523,13 @@ class ATMCSCsc(salobj.BaseCsc):
                 self.set_event(evt_name, enable=self._axis_enabled[axis])
 
         # Handle atMountState
-        if self.summary_state == salobj.State.ENABLED:
-            if self._tracking_enabled:
-                mount_state = SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingEnabledState
-            elif self._stop_gently_task and not self._stop_gently_task.done():
-                mount_state = SALPY_ATMCS.ATMCS_shared_AtMountState_StoppingState
-            else:
-                mount_state = SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabledState
+        if self._tracking_enabled:
+            mount_state = SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingEnabled
+        elif (self._stop_tracking_task is not None and not self._stop_tracking_task.done()) \
+                or (self._disable_all_drives_task is not None and not self._disable_all_drives_task.done()):
+            mount_state = SALPY_ATMCS.ATMCS_shared_AtMountState_Stopping
         else:
-            mount_state = self.summary_state
+            mount_state = SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabled
         self.evt_atMountState.set_put(state=mount_state)
 
         # Handle azimuth topple block
@@ -516,71 +570,37 @@ class ATMCSCsc(salobj.BaseCsc):
                 self.set_event(self._in_position_names[axis], inPosition=in_position)
             self.evt_allAxesInPosition.set_put(inPosition=all_in_position)
 
-        # compute m3_basic_state for use setting m3State.state
-        # and m3RotatorDetentLimitSwitch; it has the same value as
-        # m3State.state except that it ignores summary state
-        m3_basic_state = None
+        # compute m3_state for use setting m3State.state
+        # and m3RotatorDetentSwitches
+        m3_state = None
         if m3_in_position:
             # we are either at a port or at an unknown position
             for port_enum, (port_ind, state_enum) in self._port_info_dict.items():
                 port_az = self.port_az[port_ind]
                 if abs(m3curr_pos - port_az) < self.m3tolerance:
-                    m3_basic_state = state_enum
+                    m3_state = state_enum
                     break
             else:
                 # Move is finished, but not at a known point
-                m3_basic_state = SALPY_ATMCS.ATMCS_shared_M3State_UnknownPositionState
+                m3_state = SALPY_ATMCS.ATMCS_shared_M3State_UnknownPosition
         elif m3actuator.kind(t) == path.Kind.Slewing:
-            m3_basic_state = SALPY_ATMCS.ATMCS_shared_M3State_InMotionState
+            m3_state = SALPY_ATMCS.ATMCS_shared_M3State_InMotion
         else:
-            m3_basic_state = SALPY_ATMCS.ATMCS_shared_M3State_UnknownPositionState
-        assert m3_basic_state is not None
+            m3_state = SALPY_ATMCS.ATMCS_shared_M3State_UnknownPosition
+        assert m3_state is not None
 
         # handle m3State
-        if self.summary_state != salobj.State.ENABLED:
-            self.evt_m3State.set_put(state=self.summary_state)
-        else:
-            self.evt_m3State.set_put(state=m3_basic_state)
+        self.evt_m3State.set_put(state=m3_state)
 
         # Handle M3 detent switch
         detent_map = {
-            SALPY_ATMCS.ATMCS_shared_M3State_Nasmyth1State: "nasmyth1DetentActive",
-            SALPY_ATMCS.ATMCS_shared_M3State_Nasmyth2State: "nasmyth2DetentActive",
-            SALPY_ATMCS.ATMCS_shared_M3State_Port3State: "port3DetentActive",
+            SALPY_ATMCS.ATMCS_shared_M3State_Nasmyth1: "nasmyth1Active",
+            SALPY_ATMCS.ATMCS_shared_M3State_Nasmyth2: "nasmyth2Active",
+            SALPY_ATMCS.ATMCS_shared_M3State_Port3: "port3Active",
         }
-        at_field = detent_map.get(m3_basic_state, None)
+        at_field = detent_map.get(m3_state, None)
         detent_values = dict((field_name, field_name == at_field) for field_name in detent_map.values())
-        self.evt_m3RotatorDetentLimitSwitch.set_put(**detent_values)
-
-    def disable_tracking(self, gently):
-        """Disable tracking.
-
-        Parameters
-        ----------
-        gently : `bool`
-            If True then stop the axis.
-            If False then abort the axis and apply the brake.
-        """
-        for axis in MainAxes:
-            self._axis_enabled[axis] = False
-            if gently:
-                self.actuators[axis].stop()
-            else:
-                self.actuators[axis].abort()
-                self._axis_enabled[axis] = False
-                self._axis_braked[axis] = True
-
-        if self.summary_state == salobj.State.ENABLED:
-            self._axis_enabled[Axis.M3] = True
-        else:
-            self._axis_enabled[Axis.M3] = False
-            if gently:
-                self.actuators[Axis.M3].stop()
-            else:
-                self.actuators[Axis.M3].abort()
-
-        self._tracking_enabled = False
-        self.update_events()
+        self.evt_m3RotatorDetentSwitches.set_put(**detent_values)
 
     async def implement_simulation_mode(self, simulation_mode):
         if simulation_mode != 1:
@@ -602,10 +622,14 @@ class ATMCSCsc(salobj.BaseCsc):
 
     def report_summary_state(self):
         super().report_summary_state()
+        if self.summary_state == salobj.State.ENABLED:
+            for axis in Axis:
+                self._axis_enabled[axis] = True
+                self._axis_braked[axis] = False
+        else:
+            self.disable_all_drives()
         if self.summary_state in (salobj.State.DISABLED, salobj.State.ENABLED):
             asyncio.ensure_future(self.telemetry_loop())
-        if self.summary_state != salobj.State.ENABLED:
-            self.disable_tracking(gently=False)
 
     async def telemetry_loop(self):
         """Output telemetry and events that have changed
@@ -622,6 +646,8 @@ class ATMCSCsc(salobj.BaseCsc):
 
         See `update_events` for the events that are output.
         """
+        if self._telemetry_task is not None and not self._telemetry_task.done():
+            self._telemetry_task.cancel()
         while self.summary_state in (salobj.State.DISABLED, salobj.State.ENABLED):
             # update events first so that limits are handled
             self.update_events()
@@ -690,4 +716,5 @@ class ATMCSCsc(salobj.BaseCsc):
                 nasmyth1EncoderRaw=motor_encoder_counts[Axis.NA1],
                 nasmyth2EncoderRaw=motor_encoder_counts[Axis.NA2],
             )
-            await asyncio.sleep(self.telemetry_interval)
+            self._telemetry_task = asyncio.ensure_future(asyncio.sleep(self.telemetry_interval))
+            await self._telemetry_task

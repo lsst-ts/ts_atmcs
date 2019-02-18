@@ -40,14 +40,14 @@ class Harness:
             evt = getattr(self.remote, f"evt_{name}")
             return await evt.next(flush=flush, timeout=timeout)
         except Exception as e:
-            raise RuntimeError(f"Cound not get data for event {name}") from e
+            raise RuntimeError(f"Could not get data for event {name}") from e
 
     def get_evt(self, name):
         try:
             evt = getattr(self.remote, f"evt_{name}")
             return evt.get()
         except Exception as e:
-            raise RuntimeError(f"Cound not get data for event {name}") from e
+            raise RuntimeError(f"Could not get data for event {name}") from e
 
 
 class CscTestCase(unittest.TestCase):
@@ -77,7 +77,27 @@ class CscTestCase(unittest.TestCase):
             "m3InPosition",
         )
 
-    def xtest_initial_info(self):
+    async def fault_to_enabled(self, harness):
+        """Check that the CSC is in FAULT state and enable it.
+
+        Assumes that the FAULT state has not yet been read from the remote.
+        """
+        state = await harness.remote.evt_summaryState.next(flush=False, timeout=5)
+        self.assertEqual(state.summaryState, salobj.State.FAULT)
+
+        await harness.remote.cmd_standby.start(timeout=2)
+        state = await harness.remote.evt_summaryState.next(flush=False, timeout=5)
+        self.assertEqual(state.summaryState, salobj.State.STANDBY)
+
+        await harness.remote.cmd_start.start(timeout=2)
+        state = await harness.remote.evt_summaryState.next(flush=False, timeout=5)
+        self.assertEqual(state.summaryState, salobj.State.DISABLED)
+
+        await harness.remote.cmd_enable.start(timeout=2)
+        state = await harness.remote.evt_summaryState.next(flush=False, timeout=5)
+        self.assertEqual(state.summaryState, salobj.State.ENABLED)
+
+    def test_initial_info(self):
         """Check that all events and telemetry are output at startup
 
         except the m3PortSelected event
@@ -104,12 +124,8 @@ class CscTestCase(unittest.TestCase):
 
         asyncio.get_event_loop().run_until_complete(doit())
 
-    def test_track_insane_target(self):
-        """Test that tracking will reject a target out of range.
-
-        In particular make the position and velocity in range
-        but the time such that the current position is not in range.
-        """
+    def test_invalid_track_target(self):
+        """Test all reasons trackTarget may be rejected."""
         async def doit():
             harness = Harness(initial_state=salobj.State.ENABLED)
             harness.csc.configure(
@@ -118,31 +134,99 @@ class CscTestCase(unittest.TestCase):
             )
             state = await harness.remote.evt_summaryState.next(flush=False, timeout=5)
             self.assertEqual(state.summaryState, salobj.State.ENABLED)
-
             data = await harness.next_evt("atMountState")
-            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabledState)
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabled)
 
-            await harness.remote.cmd_startTracking.start(timeout=2)
-
-            data = await harness.next_evt("atMountState", timeout=1)
-            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingEnabledState)
-
-            # specify a target that is in bounds at the specified time
-            # but out of bounds at the current time
+            # cannot send trackTarget while tracking disabled;
+            # this error does not change the summary state
             harness.remote.cmd_trackTarget.set(
-                elevation=85,
-                elevationVelocity=2,
-                time=time.time() - 10,
+                azimuthDirection=SALPY_ATMCS.ATMCS_shared_AzimuthDirection_ClockWise,
+                elevation=10,
+                time=time.time(),
                 trackId=137)
             with salobj.assertRaisesAckError():
                 await harness.remote.cmd_trackTarget.start(timeout=1)
 
+            # enable tracking and try again; this time it should work
+            await harness.remote.cmd_startTracking.start(timeout=2)
             data = await harness.next_evt("atMountState")
-            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabledState)
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingEnabled)
+            await harness.remote.cmd_trackTarget.start(timeout=1)
+
+            # azimuth must be in range 0, 360 (regardless of the time);
+            # failure puts the CSC into the FAULT state
+            harness.remote.cmd_trackTarget.set(azimuth=-0.000001)
+            with salobj.assertRaisesAckError():
+                await harness.remote.cmd_trackTarget.start(timeout=1)
+            data = await harness.next_evt("atMountState")
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_Stopping)
+            data = await harness.next_evt("atMountState", 2)
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabled)
+            await self.fault_to_enabled(harness)
+
+            await harness.remote.cmd_startTracking.start(timeout=2)
+            data = await harness.next_evt("atMountState")
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingEnabled)
+
+            harness.remote.cmd_trackTarget.set(
+                azimuth=360.00001,
+                time=time.time())
+            with salobj.assertRaisesAckError():
+                await harness.remote.cmd_trackTarget.start(timeout=1)
+            data = await harness.next_evt("atMountState")
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabled)
+            await self.fault_to_enabled(harness)
+
+            await harness.remote.cmd_startTracking.start(timeout=2)
+            data = await harness.next_evt("atMountState")
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingEnabled)
+
+            # azimuthDirection must be 1 or 2;
+            # failure puts the CSC into the FAULT state
+            harness.remote.cmd_trackTarget.set(
+                azimuth=0,
+                azimuthDirection=0,
+                time=time.time())
+            with salobj.assertRaisesAckError():
+                await harness.remote.cmd_trackTarget.start(timeout=1)
+            data = await harness.next_evt("atMountState")
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabled)
+            await self.fault_to_enabled(harness)
+
+            await harness.remote.cmd_startTracking.start(timeout=2)
+            data = await harness.next_evt("atMountState")
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingEnabled)
+
+            harness.remote.cmd_trackTarget.set(
+                azimuth=0,
+                azimuthDirection=3,
+                time=time.time())
+            with salobj.assertRaisesAckError():
+                await harness.remote.cmd_trackTarget.start(timeout=1)
+            data = await harness.next_evt("atMountState")
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabled)
+            await self.fault_to_enabled(harness)
+
+            await harness.remote.cmd_startTracking.start(timeout=2)
+            data = await harness.next_evt("atMountState")
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingEnabled)
+
+            # a target that is (way) out of bounds at the specified time;
+            # failure puts the CSC into the FAULT state
+            harness.remote.cmd_trackTarget.set(
+                elevation=85,
+                elevationVelocity=2,
+                azimuthDirection=SALPY_ATMCS.ATMCS_shared_AzimuthDirection_ClockWise,
+                time=time.time() - 10)
+            with salobj.assertRaisesAckError():
+                await harness.remote.cmd_trackTarget.start(timeout=1)
+            data = await harness.next_evt("atMountState")
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabled)
+            await self.fault_to_enabled(harness)
 
         asyncio.get_event_loop().run_until_complete(doit())
 
-    def xtest_standard_state_transitions(self):
+    def test_standard_state_transitions(self):
         """Test standard CSC state transitions.
         """
         async def doit():
@@ -153,6 +237,14 @@ class CscTestCase(unittest.TestCase):
 
             state = await harness.remote.evt_summaryState.next(flush=False, timeout=2)
             self.assertEqual(state.summaryState, salobj.State.STANDBY)
+
+            for evt_name in self.brake_names:
+                data = await harness.next_evt(evt_name)
+                self.assertTrue(data.engaged)
+
+            for evt_name in self.enable_names:
+                data = await harness.next_evt(evt_name)
+                self.assertFalse(data.enable)
 
             # send start; new state is DISABLED
             id_ack = await harness.remote.cmd_start.start()
@@ -170,6 +262,14 @@ class CscTestCase(unittest.TestCase):
             state = await harness.remote.evt_summaryState.next(flush=False, timeout=2)
             self.assertEqual(state.summaryState, salobj.State.ENABLED)
 
+            for evt_name in self.brake_names:
+                data = await harness.next_evt(evt_name)
+                self.assertFalse(data.engaged)
+
+            for evt_name in self.enable_names:
+                data = await harness.next_evt(evt_name)
+                self.assertTrue(data.enable)
+
             # send disable; new state is DISABLED
             id_ack = await harness.remote.cmd_disable.start()
             self.assertEqual(id_ack.ack.ack, harness.remote.salinfo.lib.SAL__CMD_COMPLETE)
@@ -177,6 +277,14 @@ class CscTestCase(unittest.TestCase):
             self.assertEqual(harness.csc.summary_state, salobj.State.DISABLED)
             state = await harness.remote.evt_summaryState.next(flush=False, timeout=2)
             self.assertEqual(state.summaryState, salobj.State.DISABLED)
+
+            for evt_name in self.brake_names:
+                data = await harness.next_evt(evt_name)
+                self.assertTrue(data.engaged)
+
+            for evt_name in self.enable_names:
+                data = await harness.next_evt(evt_name)
+                self.assertFalse(data.enable)
 
             # send standby; new state is STANDBY
             id_ack = await harness.remote.cmd_standby.start()
@@ -198,7 +306,7 @@ class CscTestCase(unittest.TestCase):
 
         asyncio.get_event_loop().run_until_complete(doit())
 
-    def xtest_set_instrument_port(self):
+    def test_set_instrument_port(self):
         async def doit():
             harness = Harness(initial_state=salobj.State.ENABLED)
             harness.csc.configure(
@@ -209,7 +317,7 @@ class CscTestCase(unittest.TestCase):
             self.assertEqual(state.summaryState, salobj.State.ENABLED)
 
             data = await harness.next_evt("m3State")
-            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_M3State_Nasmyth1State)
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_M3State_Nasmyth1)
 
             harness.remote.cmd_setInstrumentPort.set(port=SALPY_ATMCS.ATMCS_shared_M3ExitPort_Port3)
             await harness.remote.cmd_setInstrumentPort.start(timeout=2)
@@ -217,7 +325,7 @@ class CscTestCase(unittest.TestCase):
             data = await harness.next_evt("m3PortSelected")
             self.assertEqual(data.selected, SALPY_ATMCS.ATMCS_shared_M3ExitPort_Port3)
             data = await harness.next_evt("m3State")
-            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_M3State_InMotionState)
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_M3State_InMotion)
 
             t0 = time.time()
 
@@ -233,11 +341,11 @@ class CscTestCase(unittest.TestCase):
 
             data = await harness.next_evt("m3State", timeout=5)
             print(f"test_set_instrument_port M3 rotation took {time.time() - t0:0.2f} sec")
-            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_M3State_Port3State)
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_M3State_Port3)
 
         asyncio.get_event_loop().run_until_complete(doit())
 
-    def xtest_track(self):
+    def test_track(self):
         async def doit():
             harness = Harness(initial_state=salobj.State.ENABLED)
             harness.csc.configure(
@@ -248,18 +356,7 @@ class CscTestCase(unittest.TestCase):
             self.assertEqual(state.summaryState, salobj.State.ENABLED)
 
             data = await harness.next_evt("atMountState")
-            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabledState)
-
-            for evt_name in self.brake_names:
-                data = await harness.next_evt(evt_name)
-                self.assertTrue(data.engage)
-
-            for evt_name in self.enable_names:
-                data = await harness.next_evt(evt_name)
-                if evt_name.startswith("m3"):
-                    self.assertTrue(data.enable)
-                else:
-                    self.assertFalse(data.enable)
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabled)
 
             for evt_name in self.in_position_names:
                 data = await harness.next_evt(evt_name)
@@ -274,18 +371,7 @@ class CscTestCase(unittest.TestCase):
             await harness.remote.cmd_startTracking.start(timeout=2)
 
             data = await harness.next_evt("atMountState")
-            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingEnabledState)
-
-            for evt_name in self.brake_names:
-                data = await harness.next_evt(evt_name)
-                self.assertFalse(data.engage)
-
-            for evt_name in self.enable_names:
-                data = await harness.next_evt(evt_name)
-                if evt_name.startswith("m3"):
-                    self.assertFalse(data.enable)
-                else:
-                    self.assertTrue(data.enable)
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingEnabled)
 
             # attempts to set instrument port should fail
             with salobj.assertRaisesAckError():
@@ -310,6 +396,9 @@ class CscTestCase(unittest.TestCase):
                         f"{axis_name}Velocity": vel,
                     }
                     harness.remote.cmd_trackTarget.set(**kwargs)
+                # either wrap will do; pick one
+                harness.remote.cmd_trackTarget.set(
+                    azimuthDirection=SALPY_ATMCS.ATMCS_shared_AzimuthDirection_CounterClockWise)
                 await harness.remote.cmd_trackTarget.start(timeout=1)
 
                 data = harness.remote.evt_allAxesInPosition.get()
@@ -331,24 +420,68 @@ class CscTestCase(unittest.TestCase):
 
             await harness.remote.cmd_stopTracking.start(timeout=1)
 
-            for evt_name in self.enable_names:
-                data = await harness.next_evt(evt_name)
-                if evt_name.startswith("m3"):
-                    self.assertTrue(data.enable)
-                else:
-                    self.assertFalse(data.enable)
+        asyncio.get_event_loop().run_until_complete(doit())
+
+    def test_late_track_target(self):
+        async def doit():
+            # short so test runs quickly
+            max_tracking_interval = 0.2
+            harness = Harness(initial_state=salobj.State.ENABLED)
+            harness.csc.configure(
+                max_tracking_interval=max_tracking_interval,
+                vmax=(100,)*5,
+                amax=(200,)*5,
+            )
+            state = await harness.remote.evt_summaryState.next(flush=False, timeout=5)
+            self.assertEqual(state.summaryState, salobj.State.ENABLED)
+
+            data = await harness.next_evt("atMountState")
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabled)
+
+            await harness.remote.cmd_startTracking.start(timeout=2)
+            data = await harness.next_evt("atMountState")
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingEnabled)
+
+            # wait too long for trackTarget
+            data = await harness.next_evt("atMountState", timeout=max_tracking_interval + 0.2)
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabled)
+            await self.fault_to_enabled(harness)
+
+            # try again, and this time send a trackTarget command before waiting too long
+            await harness.remote.cmd_startTracking.start(timeout=2)
+            data = await harness.next_evt("atMountState")
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingEnabled)
+
+            harness.remote.cmd_trackTarget.set(
+                elevation=10,
+                azimuthDirection=SALPY_ATMCS.ATMCS_shared_AzimuthDirection_CounterClockWise,
+                time=time.time(),
+                trackId=20,  # arbitary
+            )
+            await harness.remote.cmd_trackTarget.start(timeout=1)
+
+            # wait too long for trackTarget
+            data = await harness.next_evt("atMountState", timeout=max_tracking_interval + 0.2)
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_Stopping)
+
+            data = await harness.next_evt("atMountState", timeout=2)
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabled)
 
         asyncio.get_event_loop().run_until_complete(doit())
 
-    def xtest_stop_tracking(self):
-        """Call stopTracking before a slew is done.
+    def test_stop_tracking_while_slewing(self):
+        """Call stopTracking while tracking, before a slew is done.
         """
         async def doit():
             harness = Harness(initial_state=salobj.State.ENABLED)
             state = await harness.remote.evt_summaryState.next(flush=False, timeout=5)
             self.assertEqual(state.summaryState, salobj.State.ENABLED)
+            data = await harness.next_evt("atMountState")
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabled)
 
             await harness.remote.cmd_startTracking.start(timeout=2)
+            data = await harness.next_evt("atMountState")
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingEnabled)
 
             t0 = time.time()
             paths = dict(
@@ -368,12 +501,15 @@ class CscTestCase(unittest.TestCase):
                     f"{axis_name}Velocity": vel,
                 }
                 harness.remote.cmd_trackTarget.set(**kwargs)
-
+            harness.remote.cmd_trackTarget.set(
+                azimuthDirection=SALPY_ATMCS.ATMCS_shared_AzimuthDirection_ClockWise)
             await harness.remote.cmd_trackTarget.start(timeout=1)
 
             await asyncio.sleep(0.2)
 
             await harness.remote.cmd_stopTracking.start(timeout=1)
+            data = await harness.next_evt("atMountState")
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_Stopping)
 
             await asyncio.sleep(0.2)  # give events time to arrive
 
@@ -384,24 +520,27 @@ class CscTestCase(unittest.TestCase):
                 else:
                     self.assertFalse(data.inPosition)
 
-            for evt_name in self.enable_names:
-                data = harness.get_evt(evt_name)
-                if evt_name.startswith("m3"):
-                    self.assertTrue(data.enable)
-                else:
-                    self.assertFalse(data.enable)
+            data = await harness.next_evt("atMountState", timeout=2)
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabled)
+
+            for actuator in harness.csc.actuators:
+                self.assertEqual(actuator.kind(), ATMCSSimulator.path.Kind.Stopped)
 
         asyncio.get_event_loop().run_until_complete(doit())
 
-    def xtest_disable_while_tracking(self):
-        """Call disable before a slew is done.
+    def test_disable_while_slewing(self):
+        """Call disable while tracking, before a slew is done.
         """
         async def doit():
             harness = Harness(initial_state=salobj.State.ENABLED)
             state = await harness.remote.evt_summaryState.next(flush=False, timeout=5)
             self.assertEqual(state.summaryState, salobj.State.ENABLED)
+            data = await harness.next_evt("atMountState", timeout=2)
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabled)
 
             await harness.remote.cmd_startTracking.start(timeout=2)
+            data = await harness.next_evt("atMountState", timeout=2)
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingEnabled)
 
             t0 = time.time()
             paths = dict(
@@ -421,12 +560,15 @@ class CscTestCase(unittest.TestCase):
                     f"{axis_name}Velocity": vel,
                 }
                 harness.remote.cmd_trackTarget.set(**kwargs)
-
+            harness.remote.cmd_trackTarget.set(
+                azimuthDirection=SALPY_ATMCS.ATMCS_shared_AzimuthDirection_ClockWise)
             await harness.remote.cmd_trackTarget.start(timeout=1)
 
             await asyncio.sleep(0.2)
 
             await harness.remote.cmd_disable.start(timeout=1)
+            data = await harness.next_evt("atMountState", timeout=2)
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_Stopping)
 
             await asyncio.sleep(0.2)  # give events time to arrive
 
@@ -437,9 +579,8 @@ class CscTestCase(unittest.TestCase):
                 else:
                     self.assertFalse(data.inPosition)
 
-            for evt_name in self.enable_names:
-                data = harness.get_evt(evt_name)
-                self.assertFalse(data.enable)
+            data = await harness.next_evt("atMountState", timeout=2)
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabled)
 
         asyncio.get_event_loop().run_until_complete(doit())
 
