@@ -331,6 +331,15 @@ class ATMCSCsc(salobj.BaseCsc):
 
         for i in range(4):
             self.actuators[i].set_cmd(pos=pos[i], vel=vel[i], t=data.time)
+
+        target_fields = ("azimuth", "azimuthDirection", "azimuthVelocity",
+                         "elevation", "elevationVelocity",
+                         "nasmyth1RotatorAngle", "nasmyth1RotatorAngleVelocity",
+                         "nasmyth2RotatorAngle", "nasmyth2RotatorAngleVelocity",
+                         "time", "trackId")
+        evt_kwargs = dict((field, getattr(data, field)) for field in target_fields)
+        self.evt_target.set_put(**evt_kwargs, force_output=True)
+
         self._set_tracking_timer(restart=True)
 
     def _set_tracking_timer(self, restart):
