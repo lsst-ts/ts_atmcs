@@ -111,6 +111,7 @@ class CscTestCase(unittest.TestCase):
             for evt_name in harness.csc.salinfo.manager.getEventNames():
                 if evt_name in (
                     "m3PortSelected",  # output by setInstrumentPort
+                    "target",  # output by trackTarget
                     "summaryState",  # already read
                     "appliedSettingsMatchStart", "detailedState",
                     "errorCode", "logMessage", "settingVersions",
@@ -146,6 +147,10 @@ class CscTestCase(unittest.TestCase):
                 trackId=137)
             with salobj.assertRaisesAckError():
                 await harness.remote.cmd_trackTarget.start(timeout=1)
+
+            # the rejected target should not be output as an event
+            with self.assertRaises(asyncio.TimeoutError):
+                await harness.remote.evt_target.next(flush=False, timeout=0.1)
 
             # enable tracking and try again; this time it should work
             await harness.remote.cmd_startTracking.start(timeout=2)
@@ -401,6 +406,9 @@ class CscTestCase(unittest.TestCase):
                     azimuthDirection=SALPY_ATMCS.ATMCS_shared_AzimuthDirection_CounterClockWise)
                 await harness.remote.cmd_trackTarget.start(timeout=1)
 
+                target = await harness.remote.evt_target.next(flush=False, timeout=1)
+                self.assertTargetsAlmostEqual(harness.remote.cmd_trackTarget.data, target)
+
                 data = harness.remote.evt_allAxesInPosition.get()
                 if data.inPosition:
                     break
@@ -411,6 +419,9 @@ class CscTestCase(unittest.TestCase):
                 await asyncio.sleep(0.5)
 
             print(f"test_track slew took {time.time() - t0:0.2f} sec")
+
+            with self.assertRaises(asyncio.TimeoutError):
+                await harness.remote.evt_target.next(flush=False, timeout=0.1)
 
             for evt_name in self.in_position_names:
                 if evt_name.startswith("m3"):
@@ -583,6 +594,22 @@ class CscTestCase(unittest.TestCase):
             self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabled)
 
         asyncio.get_event_loop().run_until_complete(doit())
+
+    def assertTargetsAlmostEqual(self, target1, target2):
+        """Assert two targets are approximately equal.
+
+        Parameters
+        ----------
+        target1, target2 : `any`
+            The targets to compare. These may be instances of trackTarget
+            command data or target event data.
+        """
+        for field in ("azimuth", "azimuthDirection", "azimuthVelocity",
+                      "elevation", "elevationVelocity",
+                      "nasmyth1RotatorAngle", "nasmyth1RotatorAngleVelocity",
+                      "nasmyth2RotatorAngle", "nasmyth2RotatorAngleVelocity",
+                      "time", "trackId"):
+            self.assertAlmostEqual(getattr(target1, field), getattr(target2, field))
 
 
 if __name__ == "__main__":
