@@ -303,17 +303,10 @@ class ATMCSCsc(salobj.BaseCsc):
             raise salobj.ExpectedError("Cannot trackTarget until tracking is enabled")
         data = id_data.data
         try:
-            if data.azimuthDirection == SALPY_ATMCS.ATMCS_shared_AzimuthDirection_ClockWise:
-                wrap_pos = True
-            elif data.azimuthDirection == SALPY_ATMCS.ATMCS_shared_AzimuthDirection_CounterClockWise:
-                wrap_pos = False
-            else:
-                raise salobj.ExpectedError(f"azimuthDirection={data.azimuthDirection}; must be 1 or 2")
             pos = np.array([data.elevation, data.azimuth,
                             data.nasmyth1RotatorAngle, data.nasmyth2RotatorAngle], dtype=float)
             if not 0 <= pos[1] <= 360:
                 raise salobj.ExpectedError(f"azimuth={data.azimuth}; must be in range 0 - 360")
-            pos[1] = path.wrap_angle(pos[1], wrap_pos, self.pmin_cmd[1], self.pmax_cmd[1])
             vel = np.array([data.elevationVelocity, data.azimuthVelocity,
                            data.nasmyth1RotatorAngleVelocity, data.nasmyth2RotatorAngleVelocity], dtype=float)
             dt = time.time() - data.time
@@ -332,7 +325,7 @@ class ATMCSCsc(salobj.BaseCsc):
         for i in range(4):
             self.actuators[i].set_cmd(pos=pos[i], vel=vel[i], t=data.time)
 
-        target_fields = ("azimuth", "azimuthDirection", "azimuthVelocity",
+        target_fields = ("azimuth", "azimuthVelocity",
                          "elevation", "elevationVelocity",
                          "nasmyth1RotatorAngle", "nasmyth1RotatorAngleVelocity",
                          "nasmyth2RotatorAngle", "nasmyth2RotatorAngleVelocity",
