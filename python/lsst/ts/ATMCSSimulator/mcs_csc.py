@@ -305,8 +305,14 @@ class ATMCSCsc(salobj.BaseCsc):
         try:
             pos = np.array([data.elevation, data.azimuth,
                             data.nasmyth1RotatorAngle, data.nasmyth2RotatorAngle], dtype=float)
-            if not 0 <= pos[1] <= 360:
-                raise salobj.ExpectedError(f"azimuth={data.azimuth}; must be in range 0 - 360")
+
+            # wrap the rotator angles
+            for i in Axis.NA1, Axis.NA2:
+                # starts out in range 0, 360 and limits are approx. -165 to 165
+                # so keep this code simple (especially as it is temporary)
+                if pos[i] > self.pmax_lim[i]:
+                    pos[i] -= 360
+
             vel = np.array([data.elevationVelocity, data.azimuthVelocity,
                            data.nasmyth1RotatorAngleVelocity, data.nasmyth2RotatorAngleVelocity], dtype=float)
             dt = time.time() - data.time
