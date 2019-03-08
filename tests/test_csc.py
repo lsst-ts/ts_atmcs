@@ -440,7 +440,8 @@ class CscTestCase(unittest.TestCase):
             self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabled)
             await self.fault_to_enabled(harness)
 
-            # try again, and this time send a trackTarget command before waiting too long
+            # try again, and this time send a trackTarget command
+            # before waiting too long
             await harness.remote.cmd_startTracking.start(timeout=2)
             data = await harness.next_evt("atMountState")
             self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingEnabled)
