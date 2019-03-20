@@ -207,7 +207,7 @@ class TestActuator(unittest.TestCase):
                     dtmax_track=0.05, nsettle=1, t=0)
                 self.assertEqual(actuator.kind(0), ATMCSSimulator.path.Kind.Stopped)
                 for i in range(5):
-                    t = i*cmd_interval
+                    t = i*cmd_interval + 1  # +1 to avoid 0
                     cmd_pos = pos_off + t*vel_off
                     actuator.set_cmd(pos=cmd_pos, vel=vel_off, t=t)
                 self.assertEqual(actuator.kind(t), ATMCSSimulator.path.Kind.Slewing)
@@ -248,7 +248,7 @@ class TestActuator(unittest.TestCase):
                     dtmax_track=0.05, nsettle=1, t=0)
                 self.assertEqual(actuator.kind(0), ATMCSSimulator.path.Kind.Stopped)
                 for i in range(5):
-                    t = i*cmd_interval
+                    t = i*cmd_interval + 1  # +1 to avoid 0
                     cmd_pos = pos_off + t*vel_off
                     actuator.set_cmd(pos=cmd_pos, vel=vel_off, t=t)
                 self.assertEqual(actuator.kind(t), ATMCSSimulator.path.Kind.Slewing)

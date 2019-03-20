@@ -19,17 +19,16 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-__all__ = ["ATMCSCsc", "Axis", "MainAxes"]
+__all__ = ["ATMCSCsc", "Axis", "MainAxes", "curr_tai"]
 
 import asyncio
 import enum
-import time
 
 import numpy as np
 
 from lsst.ts import salobj
 from . import path
-from .actuator import Actuator
+from .actuator import Actuator, curr_tai
 
 import SALPY_ATMCS
 
@@ -279,13 +278,14 @@ class ATMCSCsc(salobj.BaseCsc):
         self.limit_overtravel = limit_overtravel
         """Allowed position error for M3 to be considered in position (deg)"""
 
-        t = time.time()
+        t = curr_tai()
         self.actuators = [Actuator(
             pmin=self.pmin_cmd[axis], pmax=self.pmax_cmd[axis],
             vmax=vmax[axis], amax=amax[axis],
             dtmax_track=self.max_tracking_interval,
             nsettle=self.nsettle, t=t,
         ) for axis in Axis]
+        self.actuators[0].verbose = True
 
     def do_startTracking(self, id_data):
         self.assert_enabled("startTracking")
@@ -303,20 +303,20 @@ class ATMCSCsc(salobj.BaseCsc):
             raise salobj.ExpectedError("Cannot trackTarget until tracking is enabled")
         data = id_data.data
         try:
-            if data.azimuthDirection == SALPY_ATMCS.ATMCS_shared_AzimuthDirection_ClockWise:
-                wrap_pos = True
-            elif data.azimuthDirection == SALPY_ATMCS.ATMCS_shared_AzimuthDirection_CounterClockWise:
-                wrap_pos = False
-            else:
-                raise salobj.ExpectedError(f"azimuthDirection={data.azimuthDirection}; must be 1 or 2")
             pos = np.array([data.elevation, data.azimuth,
                             data.nasmyth1RotatorAngle, data.nasmyth2RotatorAngle], dtype=float)
-            if not 0 <= pos[1] <= 360:
-                raise salobj.ExpectedError(f"azimuth={data.azimuth}; must be in range 0 - 360")
-            pos[1] = path.wrap_angle(pos[1], wrap_pos, self.pmin_cmd[1], self.pmax_cmd[1])
+
+            # wrap the azimuth and rotator angles
+            for i in Axis.Azimuth, Axis.NA1, Axis.NA2:
+                # starts out in range 0, 360 and limits are approximately
+                # -270 to 270 for azimuth and -165 to 165 for rotators,
+                # so keep this code simple (especially as it is temporary)
+                if pos[i] > self.pmax_lim[i]:
+                    pos[i] -= 360
+
             vel = np.array([data.elevationVelocity, data.azimuthVelocity,
                            data.nasmyth1RotatorAngleVelocity, data.nasmyth2RotatorAngleVelocity], dtype=float)
-            dt = time.time() - data.time
+            dt = curr_tai() - data.time
             curr_pos = pos + dt*vel
             if np.any(curr_pos < self.pmin_cmd[0:4]) or np.any(curr_pos > self.pmax_cmd[0:4]):
                 raise salobj.ExpectedError(f"One or more target positions {curr_pos} not in range "
@@ -332,7 +332,7 @@ class ATMCSCsc(salobj.BaseCsc):
         for i in range(4):
             self.actuators[i].set_cmd(pos=pos[i], vel=vel[i], t=data.time)
 
-        target_fields = ("azimuth", "azimuthDirection", "azimuthVelocity",
+        target_fields = ("azimuth", "azimuthVelocity",
                          "elevation", "elevationVelocity",
                          "nasmyth1RotatorAngle", "nasmyth1RotatorAngleVelocity",
                          "nasmyth2RotatorAngle", "nasmyth2RotatorAngleVelocity",
@@ -368,7 +368,7 @@ class ATMCSCsc(salobj.BaseCsc):
             port_az = self.port_az[port_az_ind]
         except IndexError:
             raise RuntimeError(f"Bug! invalid port_az_ind={port_az_ind} for port={port}")
-        self.actuators[Axis.M3].set_cmd(pos=port_az, vel=0, t=time.time())
+        self.actuators[Axis.M3].set_cmd(pos=port_az, vel=0, t=curr_tai())
         self.evt_m3PortSelected.set_put(selected=port)
 
     async def do_stopTracking(self, id_data):
@@ -401,7 +401,7 @@ class ATMCSCsc(salobj.BaseCsc):
         """
         self._tracking_enabled = False
         already_stopped = True
-        t0 = time.time()
+        t0 = curr_tai()
         for axis in Axis:
             actuator = self.actuators[axis]
             if actuator.kind(t0) == path.Kind.Stopped:
@@ -422,7 +422,7 @@ class ATMCSCsc(salobj.BaseCsc):
         end_times = [actuator.curr[-1].t0 for actuator in self.actuators]
         max_end_time = max(end_times)
         # give a bit of margin to be sure the axes are stopped
-        dt = 0.1 + max_end_time - time.time()
+        dt = 0.1 + max_end_time - curr_tai()
         if dt > 0:
             await asyncio.sleep(dt)
         for axis in Axis:
@@ -435,7 +435,7 @@ class ATMCSCsc(salobj.BaseCsc):
         """
         end_times = [self.actuators[axis].curr[-1].t0 for axis in MainAxes]
         max_end_time = max(end_times)
-        dt = 0.1 + max_end_time - time.time()
+        dt = 0.1 + max_end_time - curr_tai()
         if dt > 0:
             await asyncio.sleep(dt)
         asyncio.ensure_future(self._run_update_events())
@@ -494,7 +494,7 @@ class ATMCSCsc(salobj.BaseCsc):
         and for axes that have run into a limit switch, abort the axis,
         disable its drives and set its brakes.
         """
-        t = time.time()
+        t = curr_tai()
         curr_pos = np.array([actuator.curr.pva(t)[0] for actuator in self.actuators], dtype=float)
         m3actuator = self.actuators[Axis.M3]
 
@@ -661,7 +661,7 @@ class ATMCSCsc(salobj.BaseCsc):
             # update events first so that limits are handled
             self.update_events()
 
-            curr_time = time.time()
+            curr_time = curr_tai()
             pva_list = [actuator.curr.pva(curr_time) for actuator in self.actuators]
             curr_pos = np.array([pva[0] for pva in pva_list], dtype=float)
             curr_vel = np.array([pva[1] for pva in pva_list], dtype=float)

@@ -19,11 +19,23 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-__all__ = ["Actuator"]
+__all__ = ["Actuator", "curr_tai"]
 
-import time
+from astropy.time import Time
 
 from . import path
+
+
+def curr_tai():
+    """Get the current time as TAI in unix seconds.
+
+    This is the same format used by the ATPtg CSC.
+    """
+    # unfortunately I can't just output curr_time.tai.unix
+    # because that has the same value as curr_time.utc.unix
+    curr_time = Time.now()
+    tai_minus_utc = (curr_time.tai.mjd - curr_time.utc.mjd)*24*60*60
+    return curr_time.utc.unix + tai_minus_utc
 
 
 class Actuator:
@@ -50,7 +62,7 @@ class Actuator:
         before ``self.kind(t)`` reports tracking instead of slewing.
     t : `float` (optional)
         Time for initial `cmd` `TPVAJ` and `curr` `Path`;
-        if None then use ``time.time()``.
+        if None then use ``curr_tai()``.
         This is primarily for unit tests; None is usually what you want.
 
     Raises
@@ -73,7 +85,7 @@ class Actuator:
         self.nsettle = nsettle
 
         if t is None:
-            t = time.time()
+            t = curr_tai()
         if pmin <= 0 and 0 < pmax:
             p0 = 0
         else:
@@ -92,12 +104,14 @@ class Actuator:
         vel : `float`
             Velocity (deg/sec)
         t : `float`
-            Time as a unix time, e.g. ``time.time()`` (sec)
+            Time as a unix time, e.g. ``curr_tai()`` (sec)
         """
         tA = self.cmd.t0  # last commanded time
         dt = t - tA
         newcurr = None
-        if 0 < dt < self.dtmax_track:
+        if dt <= 0:
+            raise RuntimeError(f"New t = {t} <= previous cmd t = {tA}")
+        if dt < self.dtmax_track:
             # try tracking
             pcurr_tA, vcurr_tA = self.curr.pva(tA)[0:2]
             segment = path.Segment(dt=dt, pA=pcurr_tA, pB=pos, vA=vcurr_tA, vB=vel, do_pos_lim=True)
@@ -138,11 +152,11 @@ class Actuator:
         ----------
         t : `float` (optional)
             Time for initial `cmd` `TPVAJ` and `curr` `Path`;
-            if None then use ``time.time()``.
+            if None then use ``curr_tai()``.
             This is primarily for unit tests; None is usually what you want.
         """
         if t is None:
-            t = time.time()
+            t = curr_tai()
         p0, v0 = self.curr.pva(t)[0:2]
         self.curr = path.stop(p0=p0, v0=v0, t0=t, amax=self.amax)
         self.cmd = self.curr[-1]
@@ -156,14 +170,14 @@ class Actuator:
         ----------
         t : `float` (optional)
             Time for initial `cmd` `TPVAJ` and `curr` `Path`;
-            if None then use ``time.time()``.
+            if None then use ``curr_tai()``.
             This is primarily for unit tests; None is usually what you want.
         pos : `float` (optional)
             Position at which to stop (deg); if `None` then stop at position
             at time ``t``.
         """
         if t is None:
-            t = time.time()
+            t = curr_tai()
         if pos is None:
             pos = self.curr.pva(t)[0]
         self.curr = path.Path(path.TPVAJ(t0=t, p0=pos), kind=path.Kind.Stopped)
@@ -179,7 +193,7 @@ class Actuator:
           the kind is reported as stopped.
         """
         if t is None:
-            t = time.time()
+            t = curr_tai()
         if self.curr.kind == path.Kind.Tracking:
             if self._ntrack > self.nsettle:
                 return path.Kind.Tracking
