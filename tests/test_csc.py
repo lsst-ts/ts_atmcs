@@ -19,8 +19,8 @@
 # You should have received a copy of the GNU General Public License
 
 import asyncio
-import time
 import unittest
+import warnings
 
 from lsst.ts import salobj
 from lsst.ts import ATMCSSimulator
@@ -52,6 +52,12 @@ class Harness:
 
 class CscTestCase(unittest.TestCase):
     def setUp(self):
+        self.axis_names = (  # names of axes for trackTarget command
+            "elevation",
+            "azimuth",
+            "nasmyth1RotatorAngle",
+            "nasmyth2RotatorAngle",
+        )
         self.enable_names = (
             "elevationDriveStatus",
             "azimuthDrive1Status",
@@ -129,7 +135,11 @@ class CscTestCase(unittest.TestCase):
         """Test all reasons trackTarget may be rejected."""
         async def doit():
             harness = Harness(initial_state=salobj.State.ENABLED)
+            pmin_cmd = (5, -270, -165, -165, 0)
+            pmax_cmd = (90, 270, 165, 165, 180)
             harness.csc.configure(
+                pmin_cmd=pmin_cmd,
+                pmax_cmd=pmax_cmd,
                 vmax=(100,)*5,
                 amax=(200,)*5,
             )
@@ -141,9 +151,8 @@ class CscTestCase(unittest.TestCase):
             # cannot send trackTarget while tracking disabled;
             # this error does not change the summary state
             harness.remote.cmd_trackTarget.set(
-                azimuthDirection=SALPY_ATMCS.ATMCS_shared_AzimuthDirection_ClockWise,
                 elevation=10,
-                time=time.time(),
+                time=ATMCSSimulator.curr_tai(),
                 trackId=137)
             with salobj.assertRaisesAckError():
                 await harness.remote.cmd_trackTarget.start(timeout=1)
@@ -158,71 +167,47 @@ class CscTestCase(unittest.TestCase):
             self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingEnabled)
             await harness.remote.cmd_trackTarget.start(timeout=1)
 
-            # azimuth must be in range 0, 360 (regardless of the time);
-            # failure puts the CSC into the FAULT state
-            harness.remote.cmd_trackTarget.set(azimuth=-0.000001)
-            with salobj.assertRaisesAckError():
-                await harness.remote.cmd_trackTarget.start(timeout=1)
-            data = await harness.next_evt("atMountState")
-            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_Stopping)
-            data = await harness.next_evt("atMountState", 2)
-            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabled)
-            await self.fault_to_enabled(harness)
+            # TODO: remove warning once ATPtg is updated so target azimuth
+            # and rotator angles are absolute (e.g. in range min_pos, max_pos)
+            for axis in ATMCSSimulator.Axis:
+                if axis == ATMCSSimulator.Axis.M3:
+                    continue  # trackTarget doesn't accept M3
+                if axis in (ATMCSSimulator.Axis.Azimuth, ATMCSSimulator.Axis.NA1, ATMCSSimulator.Axis.NA2):
+                    warnings.warn(f"Skipping range test for axis {axis} until ATPtg is updated")
+                    continue
+                with self.subTest(axis=axis):
+                    pmin_kwargs = {self.axis_names[axis]: pmin_cmd[axis] - 0.000001}
+                    harness.remote.cmd_trackTarget.set(time=ATMCSSimulator.curr_tai(), **pmin_kwargs)
+                    with salobj.assertRaisesAckError():
+                        await harness.remote.cmd_trackTarget.start(timeout=1)
+                    data = await harness.next_evt("atMountState")
+                    self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_Stopping)
+                    data = await harness.next_evt("atMountState", 2)
+                    self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabled)
+                    await self.fault_to_enabled(harness)
 
-            await harness.remote.cmd_startTracking.start(timeout=2)
-            data = await harness.next_evt("atMountState")
-            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingEnabled)
+                    await harness.remote.cmd_startTracking.start(timeout=2)
+                    data = await harness.next_evt("atMountState")
+                    self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingEnabled)
 
-            harness.remote.cmd_trackTarget.set(
-                azimuth=360.00001,
-                time=time.time())
-            with salobj.assertRaisesAckError():
-                await harness.remote.cmd_trackTarget.start(timeout=1)
-            data = await harness.next_evt("atMountState")
-            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabled)
-            await self.fault_to_enabled(harness)
+                    pmax_kwargs = {self.axis_names[axis]: pmax_cmd[axis] + 0.000001}
+                    harness.remote.cmd_trackTarget.set(time=ATMCSSimulator.curr_tai(), **pmax_kwargs)
+                    with salobj.assertRaisesAckError():
+                        await harness.remote.cmd_trackTarget.start(timeout=1)
+                    data = await harness.next_evt("atMountState")
+                    self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabled)
+                    await self.fault_to_enabled(harness)
 
-            await harness.remote.cmd_startTracking.start(timeout=2)
-            data = await harness.next_evt("atMountState")
-            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingEnabled)
-
-            # azimuthDirection must be 1 or 2;
-            # failure puts the CSC into the FAULT state
-            harness.remote.cmd_trackTarget.set(
-                azimuth=0,
-                azimuthDirection=0,
-                time=time.time())
-            with salobj.assertRaisesAckError():
-                await harness.remote.cmd_trackTarget.start(timeout=1)
-            data = await harness.next_evt("atMountState")
-            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabled)
-            await self.fault_to_enabled(harness)
-
-            await harness.remote.cmd_startTracking.start(timeout=2)
-            data = await harness.next_evt("atMountState")
-            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingEnabled)
-
-            harness.remote.cmd_trackTarget.set(
-                azimuth=0,
-                azimuthDirection=3,
-                time=time.time())
-            with salobj.assertRaisesAckError():
-                await harness.remote.cmd_trackTarget.start(timeout=1)
-            data = await harness.next_evt("atMountState")
-            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabled)
-            await self.fault_to_enabled(harness)
-
-            await harness.remote.cmd_startTracking.start(timeout=2)
-            data = await harness.next_evt("atMountState")
-            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingEnabled)
+                    await harness.remote.cmd_startTracking.start(timeout=2)
+                    data = await harness.next_evt("atMountState")
+                    self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingEnabled)
 
             # a target that is (way) out of bounds at the specified time;
             # failure puts the CSC into the FAULT state
             harness.remote.cmd_trackTarget.set(
                 elevation=85,
-                elevationVelocity=2,
-                azimuthDirection=SALPY_ATMCS.ATMCS_shared_AzimuthDirection_ClockWise,
-                time=time.time() - 10)
+                elevationVelocity=-2,
+                time=ATMCSSimulator.curr_tai() + 10)
             with salobj.assertRaisesAckError():
                 await harness.remote.cmd_trackTarget.start(timeout=1)
             data = await harness.next_evt("atMountState")
@@ -332,7 +317,7 @@ class CscTestCase(unittest.TestCase):
             data = await harness.next_evt("m3State")
             self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_M3State_InMotion)
 
-            t0 = time.time()
+            t0 = ATMCSSimulator.curr_tai()
 
             await asyncio.sleep(0.2)
 
@@ -341,11 +326,11 @@ class CscTestCase(unittest.TestCase):
                 await harness.remote.cmd_startTracking.start()
 
             actuator = harness.csc.actuators[ATMCSSimulator.Axis.M3]
-            curr_pos, curr_vel = actuator.curr.pva(time.time())[0:2]
+            curr_pos, curr_vel = actuator.curr.pva(ATMCSSimulator.curr_tai())[0:2]
             self.assertNotEqual(curr_vel, 0)
 
             data = await harness.next_evt("m3State", timeout=5)
-            print(f"test_set_instrument_port M3 rotation took {time.time() - t0:0.2f} sec")
+            print(f"test_set_instrument_port M3 rotation took {ATMCSSimulator.curr_tai() - t0:0.2f} sec")
             self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_M3State_Port3)
 
         asyncio.get_event_loop().run_until_complete(doit())
@@ -383,7 +368,7 @@ class CscTestCase(unittest.TestCase):
                 harness.remote.cmd_setInstrumentPort.set(port=1)
                 await harness.remote.cmd_setInstrumentPort.start()
 
-            t0 = time.time()
+            t0 = ATMCSSimulator.curr_tai()
             paths = dict(
                 elevation=ATMCSSimulator.path.TPVAJ(t0=t0, p0=6, v0=0.001),
                 azimuth=ATMCSSimulator.path.TPVAJ(t0=t0, p0=5, v0=-0.001),
@@ -392,7 +377,7 @@ class CscTestCase(unittest.TestCase):
             )
             trackId = 20  # arbitary
             while True:
-                t = time.time() + 0.1  # offset is arbitrary but reasonable
+                t = ATMCSSimulator.curr_tai() + 0.1  # offset is arbitrary but reasonable
                 harness.remote.cmd_trackTarget.set(time=t, trackId=trackId)
                 for axis_name, path in paths.items():
                     pos, vel = path.pva(t)[0:2]
@@ -401,9 +386,6 @@ class CscTestCase(unittest.TestCase):
                         f"{axis_name}Velocity": vel,
                     }
                     harness.remote.cmd_trackTarget.set(**kwargs)
-                # either wrap will do; pick one
-                harness.remote.cmd_trackTarget.set(
-                    azimuthDirection=SALPY_ATMCS.ATMCS_shared_AzimuthDirection_CounterClockWise)
                 await harness.remote.cmd_trackTarget.start(timeout=1)
 
                 target = await harness.remote.evt_target.next(flush=False, timeout=1)
@@ -413,12 +395,12 @@ class CscTestCase(unittest.TestCase):
                 if data.inPosition:
                     break
 
-                if time.time() - t0 > 5:
+                if ATMCSSimulator.curr_tai() - t0 > 5:
                     raise self.fail("Timed out waiting for slew to finish")
 
                 await asyncio.sleep(0.5)
 
-            print(f"test_track slew took {time.time() - t0:0.2f} sec")
+            print(f"test_track slew took {ATMCSSimulator.curr_tai() - t0:0.2f} sec")
 
             with self.assertRaises(asyncio.TimeoutError):
                 await harness.remote.evt_target.next(flush=False, timeout=0.1)
@@ -458,15 +440,15 @@ class CscTestCase(unittest.TestCase):
             self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabled)
             await self.fault_to_enabled(harness)
 
-            # try again, and this time send a trackTarget command before waiting too long
+            # try again, and this time send a trackTarget command
+            # before waiting too long
             await harness.remote.cmd_startTracking.start(timeout=2)
             data = await harness.next_evt("atMountState")
             self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingEnabled)
 
             harness.remote.cmd_trackTarget.set(
                 elevation=10,
-                azimuthDirection=SALPY_ATMCS.ATMCS_shared_AzimuthDirection_CounterClockWise,
-                time=time.time(),
+                time=ATMCSSimulator.curr_tai(),
                 trackId=20,  # arbitary
             )
             await harness.remote.cmd_trackTarget.start(timeout=1)
@@ -494,7 +476,7 @@ class CscTestCase(unittest.TestCase):
             data = await harness.next_evt("atMountState")
             self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingEnabled)
 
-            t0 = time.time()
+            t0 = ATMCSSimulator.curr_tai()
             paths = dict(
                 elevation=ATMCSSimulator.path.TPVAJ(t0=t0, p0=45),
                 azimuth=ATMCSSimulator.path.TPVAJ(t0=t0, p0=100),
@@ -512,8 +494,6 @@ class CscTestCase(unittest.TestCase):
                     f"{axis_name}Velocity": vel,
                 }
                 harness.remote.cmd_trackTarget.set(**kwargs)
-            harness.remote.cmd_trackTarget.set(
-                azimuthDirection=SALPY_ATMCS.ATMCS_shared_AzimuthDirection_ClockWise)
             await harness.remote.cmd_trackTarget.start(timeout=1)
 
             await asyncio.sleep(0.2)
@@ -553,7 +533,7 @@ class CscTestCase(unittest.TestCase):
             data = await harness.next_evt("atMountState", timeout=2)
             self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingEnabled)
 
-            t0 = time.time()
+            t0 = ATMCSSimulator.curr_tai()
             paths = dict(
                 elevation=ATMCSSimulator.path.TPVAJ(t0=t0, p0=45),
                 azimuth=ATMCSSimulator.path.TPVAJ(t0=t0, p0=100),
@@ -571,8 +551,6 @@ class CscTestCase(unittest.TestCase):
                     f"{axis_name}Velocity": vel,
                 }
                 harness.remote.cmd_trackTarget.set(**kwargs)
-            harness.remote.cmd_trackTarget.set(
-                azimuthDirection=SALPY_ATMCS.ATMCS_shared_AzimuthDirection_ClockWise)
             await harness.remote.cmd_trackTarget.start(timeout=1)
 
             await asyncio.sleep(0.2)
@@ -604,7 +582,7 @@ class CscTestCase(unittest.TestCase):
             The targets to compare. These may be instances of trackTarget
             command data or target event data.
         """
-        for field in ("azimuth", "azimuthDirection", "azimuthVelocity",
+        for field in ("azimuth", "azimuthVelocity",
                       "elevation", "elevationVelocity",
                       "nasmyth1RotatorAngle", "nasmyth1RotatorAngleVelocity",
                       "nasmyth2RotatorAngle", "nasmyth2RotatorAngleVelocity",

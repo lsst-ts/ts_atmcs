@@ -93,9 +93,9 @@ class Segment(object):
         # If desired, compute minimum and maximum position (pmin and pmax)
         # pmin and pmax may occur at the endpoints or at times t_pex1 or t_pex2
         # (the two solutions to the quadratic equation v(t) = 0).
-        # Note that lim (j->0) t_pexArr = - vA / aA, yet the equation used below
-        # is ill-behaved at small j. Also, it's hard to distinguish the cases
-        # t_pexArr out of the range [0,dt], and t_pexArr unevaluatable.
+        # Note that lim (j->0) t_pexArr = - vA / aA, yet the equation used
+        # below is ill-behaved at small j. Also, it's hard to distinguish the
+        # cases t_pexArr out of the range [0,dt], and t_pexArr unevaluatable.
         # Rather than try, I simply use - vA / aA whenever the standard
         # equation would not give me a reasonable answer
         # (hence either t_pexArr = an endpoint, or =[0] - vA / aA;
@@ -105,8 +105,10 @@ class Segment(object):
             numArr = [0]*2
             pexArr = [0]*2
 
-            # compute the two times t_pexArr, and positions pexArr = p(t_pexArr);
-            # if a t_pexArr is out of range [0, dt), set it to 0 (so its pexArr = pA)
+            # compute the two times t_pexArr,
+            # and positions pexArr = p(t_pexArr);
+            # if a t_pexArr is out of range [0, dt), set it to 0
+            # (so its pexArr = pA)
             if abs(vA) < abs(aA * dt):
                 t_pex_zeroj = max(-vA / aA, 0.0)
             else:
