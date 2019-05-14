@@ -3,7 +3,7 @@
 *.cfgc
 *.pyc
 config.log
-ospl-info.log
+ospl-*.log
 
 # Built by sconsUtils
 version.py
