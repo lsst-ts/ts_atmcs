@@ -323,7 +323,7 @@ class ATMCSCsc(salobj.BaseCsc):
                                            f"{self.pmin_cmd} to {self.pmax_cmd} at the current time")
             if np.any(np.abs(vel) > self.vmax[0:4]):
                 raise salobj.ExpectedError(f"Magnitude of one or more target velocities "
-                                           f"{vel} > {self.pmax_vel}")
+                                           f"{vel} > {self.vmax}")
         except Exception as e:
             self.evt_errorCode.set_put(errorCode=1, errorReport=f"trackTarget failed: {e}", force_output=True)
             self.fault()
