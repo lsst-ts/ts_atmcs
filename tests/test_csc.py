@@ -20,7 +20,6 @@
 
 import asyncio
 import unittest
-import warnings
 
 from lsst.ts import salobj
 from lsst.ts import ATMCSSimulator
@@ -137,12 +136,21 @@ class CscTestCase(unittest.TestCase):
             harness = Harness(initial_state=salobj.State.ENABLED)
             pmin_cmd = (5, -270, -165, -165, 0)
             pmax_cmd = (90, 270, 165, 165, 180)
+            vmax = (100,)*5
             harness.csc.configure(
                 pmin_cmd=pmin_cmd,
                 pmax_cmd=pmax_cmd,
-                vmax=(100,)*5,
+                vmax=vmax,
                 amax=(200,)*5,
             )
+            good_target_kwargs = dict((name, 0) for name in self.axis_names)
+            # elevation does not have 0 in its valid range
+            good_target_kwargs[self.axis_names[0]] = pmin_cmd[0]
+            # zero velocity as well
+            vel_kwargs = dict((f"{name}Velocity", 0) for name in self.axis_names)
+            good_target_kwargs.update(vel_kwargs)
+            good_target_kwargs["trackId"] = 137
+
             state = await harness.remote.evt_summaryState.next(flush=False, timeout=5)
             self.assertEqual(state.summaryState, salobj.State.ENABLED)
             data = await harness.next_evt("atMountState")
@@ -150,10 +158,7 @@ class CscTestCase(unittest.TestCase):
 
             # cannot send trackTarget while tracking disabled;
             # this error does not change the summary state
-            harness.remote.cmd_trackTarget.set(
-                elevation=10,
-                time=ATMCSSimulator.curr_tai(),
-                trackId=137)
+            harness.remote.cmd_trackTarget.set(time=ATMCSSimulator.curr_tai(), **good_target_kwargs)
             with salobj.assertRaisesAckError():
                 await harness.remote.cmd_trackTarget.start(timeout=1)
 
@@ -166,23 +171,29 @@ class CscTestCase(unittest.TestCase):
             data = await harness.next_evt("atMountState")
             self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingEnabled)
             await harness.remote.cmd_trackTarget.start(timeout=1)
+            await asyncio.sleep(0.1)
 
-            # TODO: remove warning once ATPtg is updated so target azimuth
-            # and rotator angles are absolute (e.g. in range min_pos, max_pos)
+            # disable tracking and re-enable, so state is TrackingEnabled
+            await harness.remote.cmd_stopTracking.start(timeout=2)
+            data = await harness.next_evt("atMountState")
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_Stopping)
+            data = await harness.next_evt("atMountState")
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabled)
+
             for axis in ATMCSSimulator.Axis:
                 if axis == ATMCSSimulator.Axis.M3:
                     continue  # trackTarget doesn't accept M3
-                if axis in (ATMCSSimulator.Axis.Azimuth, ATMCSSimulator.Axis.NA1, ATMCSSimulator.Axis.NA2):
-                    warnings.warn(f"Skipping range test for axis {axis} until ATPtg is updated")
-                    continue
                 with self.subTest(axis=axis):
-                    pmin_kwargs = {self.axis_names[axis]: pmin_cmd[axis] - 0.000001}
+                    await harness.remote.cmd_startTracking.start(timeout=2)
+                    data = await harness.next_evt("atMountState")
+                    self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingEnabled)
+
+                    pmin_kwargs = good_target_kwargs.copy()
+                    pmin_kwargs[self.axis_names[axis]] = pmin_cmd[axis] - 0.000001
                     harness.remote.cmd_trackTarget.set(time=ATMCSSimulator.curr_tai(), **pmin_kwargs)
                     with salobj.assertRaisesAckError():
                         await harness.remote.cmd_trackTarget.start(timeout=1)
-                    data = await harness.next_evt("atMountState")
-                    self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_Stopping)
-                    data = await harness.next_evt("atMountState", 2)
+                    data = await harness.next_evt("atMountState", timeout=2)
                     self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabled)
                     await self.fault_to_enabled(harness)
 
@@ -190,7 +201,8 @@ class CscTestCase(unittest.TestCase):
                     data = await harness.next_evt("atMountState")
                     self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingEnabled)
 
-                    pmax_kwargs = {self.axis_names[axis]: pmax_cmd[axis] + 0.000001}
+                    pmax_kwargs = good_target_kwargs.copy()
+                    pmax_kwargs[self.axis_names[axis]] = pmax_cmd[axis] + 0.000001
                     harness.remote.cmd_trackTarget.set(time=ATMCSSimulator.curr_tai(), **pmax_kwargs)
                     with salobj.assertRaisesAckError():
                         await harness.remote.cmd_trackTarget.start(timeout=1)
@@ -202,12 +214,25 @@ class CscTestCase(unittest.TestCase):
                     data = await harness.next_evt("atMountState")
                     self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingEnabled)
 
+                    vmax_kwargs = good_target_kwargs.copy()
+                    vmax_kwargs[f"{self.axis_names[axis]}Velocity"] = vmax[axis] + 0.000001
+                    harness.remote.cmd_trackTarget.set(time=ATMCSSimulator.curr_tai(), **vmax_kwargs)
+                    with salobj.assertRaisesAckError():
+                        await harness.remote.cmd_trackTarget.start(timeout=1)
+                    data = await harness.next_evt("atMountState", timeout=2)
+                    self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabled)
+                    await self.fault_to_enabled(harness)
+
+            await harness.remote.cmd_startTracking.start(timeout=2)
+            data = await harness.next_evt("atMountState")
+            self.assertEqual(data.state, SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingEnabled)
+
             # a target that is (way) out of bounds at the specified time;
             # failure puts the CSC into the FAULT state
-            harness.remote.cmd_trackTarget.set(
-                elevation=85,
-                elevationVelocity=-2,
-                time=ATMCSSimulator.curr_tai() + 10)
+            way_out_kwargs = good_target_kwargs.copy()
+            way_out_kwargs["elevation"] = 85
+            way_out_kwargs["elevationVelocity"] = -2
+            harness.remote.cmd_trackTarget.set(time=ATMCSSimulator.curr_tai() + 10, **way_out_kwargs)
             with salobj.assertRaisesAckError():
                 await harness.remote.cmd_trackTarget.start(timeout=1)
             data = await harness.next_evt("atMountState")
