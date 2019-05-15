@@ -305,15 +305,6 @@ class ATMCSCsc(salobj.BaseCsc):
         try:
             pos = np.array([data.elevation, data.azimuth,
                             data.nasmyth1RotatorAngle, data.nasmyth2RotatorAngle], dtype=float)
-
-            # wrap the azimuth and rotator angles
-            for i in Axis.Azimuth, Axis.NA1, Axis.NA2:
-                # starts out in range 0, 360 and limits are approximately
-                # -270 to 270 for azimuth and -165 to 165 for rotators,
-                # so keep this code simple (especially as it is temporary)
-                if pos[i] > self.pmax_lim[i]:
-                    pos[i] -= 360
-
             vel = np.array([data.elevationVelocity, data.azimuthVelocity,
                            data.nasmyth1RotatorAngleVelocity, data.nasmyth2RotatorAngleVelocity], dtype=float)
             dt = curr_tai() - data.time
@@ -323,7 +314,7 @@ class ATMCSCsc(salobj.BaseCsc):
                                            f"{self.pmin_cmd} to {self.pmax_cmd} at the current time")
             if np.any(np.abs(vel) > self.vmax[0:4]):
                 raise salobj.ExpectedError(f"Magnitude of one or more target velocities "
-                                           f"{vel} > {self.pmax_vel}")
+                                           f"{vel} > {self.vmax}")
         except Exception as e:
             self.evt_errorCode.set_put(errorCode=1, errorReport=f"trackTarget failed: {e}", force_output=True)
             self.fault()
