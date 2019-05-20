@@ -30,8 +30,6 @@ from lsst.ts import salobj
 from . import path
 from .actuator import Actuator, curr_tai
 
-import SALPY_ATMCS
-
 
 class Axis(enum.IntEnum):
     Elevation = 0
@@ -83,7 +81,7 @@ class ATMCSCsc(salobj.BaseCsc):
       * Otherwise neither switch is active
     """
     def __init__(self, initial_state=salobj.State.STANDBY, initial_simulation_mode=1):
-        super().__init__(SALPY_ATMCS, index=0, initial_state=initial_state,
+        super().__init__(name="ATMCS", index=0, initial_state=initial_state,
                          initial_simulation_mode=initial_simulation_mode)
         self.telemetry_interval = 0.1
         """Interval between telemetry updates (sec)"""
@@ -94,9 +92,9 @@ class ATMCSCsc(salobj.BaseCsc):
         self._disable_all_drives_task = None
         """Task that runs while axes are halting before being disabled."""
         self._port_info_dict = {
-            SALPY_ATMCS.ATMCS_shared_M3ExitPort_Nasmyth1: (0, SALPY_ATMCS.ATMCS_shared_M3State_Nasmyth1),
-            SALPY_ATMCS.ATMCS_shared_M3ExitPort_Nasmyth2: (1, SALPY_ATMCS.ATMCS_shared_M3State_Nasmyth2),
-            SALPY_ATMCS.ATMCS_shared_M3ExitPort_Port3: (2, SALPY_ATMCS.ATMCS_shared_M3State_Port3),
+            1: (0, 1),  # 1 = Nasmyth1
+            2: (1, 2),  # 2 = Nasmyth2
+            3: (2, 3),  # 3 = Port3
         }
         """Dict of port enum: (port_az index, M3State enum constant)"""
 
@@ -287,7 +285,7 @@ class ATMCSCsc(salobj.BaseCsc):
         ) for axis in Axis]
         self.actuators[0].verbose = True
 
-    def do_startTracking(self, id_data):
+    def do_startTracking(self, data):
         self.assert_enabled("startTracking")
         if not self.evt_m3InPosition.data.inPosition:
             raise salobj.ExpectedError("Cannot startTracking until M3 is at a known position")
@@ -297,11 +295,10 @@ class ATMCSCsc(salobj.BaseCsc):
         self.update_events()
         self._set_tracking_timer(restart=True)
 
-    def do_trackTarget(self, id_data):
+    def do_trackTarget(self, data):
         self.assert_enabled("trackTarget")
         if not self._tracking_enabled:
             raise salobj.ExpectedError("Cannot trackTarget until tracking is enabled")
-        data = id_data.data
         try:
             pos = np.array([data.elevation, data.azimuth,
                             data.nasmyth1RotatorAngle, data.nasmyth2RotatorAngle], dtype=float)
@@ -330,6 +327,7 @@ class ATMCSCsc(salobj.BaseCsc):
                          "time", "trackId")
         evt_kwargs = dict((field, getattr(data, field)) for field in target_fields)
         self.evt_target.set_put(**evt_kwargs, force_output=True)
+        self.tel_mountEncoders.set(trackId=data.trackId)
 
         self._set_tracking_timer(restart=True)
 
@@ -346,11 +344,11 @@ class ATMCSCsc(salobj.BaseCsc):
         if restart:
             self._kill_tracking_timer = asyncio.ensure_future(self.kill_tracking())
 
-    def do_setInstrumentPort(self, id_data):
+    def do_setInstrumentPort(self, data):
         self.assert_enabled("setInstrumentPort")
         if self._tracking_enabled:
             raise salobj.ExpectedError("Cannot setInstrumentPort while tracking is enabled")
-        port = id_data.data.port
+        port = data.port
         try:
             port_az_ind = self._port_info_dict[port][0]
         except IndexError:
@@ -362,7 +360,7 @@ class ATMCSCsc(salobj.BaseCsc):
         self.actuators[Axis.M3].set_cmd(pos=port_az, vel=0, t=curr_tai())
         self.evt_m3PortSelected.set_put(selected=port)
 
-    async def do_stopTracking(self, id_data):
+    async def do_stopTracking(self, data):
         self.assert_enabled("stopTracking")
         if self._stop_tracking_task and not self._stop_tracking_task.done():
             raise salobj.ExpectedError("Already stopping")
@@ -524,12 +522,12 @@ class ATMCSCsc(salobj.BaseCsc):
 
         # Handle atMountState
         if self._tracking_enabled:
-            mount_state = SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingEnabled
+            mount_state = 2  # 2 = TrackingEnabled
         elif (self._stop_tracking_task is not None and not self._stop_tracking_task.done()) \
                 or (self._disable_all_drives_task is not None and not self._disable_all_drives_task.done()):
-            mount_state = SALPY_ATMCS.ATMCS_shared_AtMountState_Stopping
+            mount_state = 3  # 3 = Stopping
         else:
-            mount_state = SALPY_ATMCS.ATMCS_shared_AtMountState_TrackingDisabled
+            mount_state = 1  # 1 = TrackingDisabled
         self.evt_atMountState.set_put(state=mount_state)
 
         # Handle azimuth topple block
@@ -582,11 +580,11 @@ class ATMCSCsc(salobj.BaseCsc):
                     break
             else:
                 # Move is finished, but not at a known point
-                m3_state = SALPY_ATMCS.ATMCS_shared_M3State_UnknownPosition
+                m3_state = 5  # 5 = UnknownPosition
         elif m3actuator.kind(t) == path.Kind.Slewing:
-            m3_state = SALPY_ATMCS.ATMCS_shared_M3State_InMotion
+            m3_state = 4  # 4 = InMotion
         else:
-            m3_state = SALPY_ATMCS.ATMCS_shared_M3State_UnknownPosition
+            m3_state = 5  # 5 = UnknownPosition
         assert m3_state is not None
 
         # handle m3State
@@ -594,9 +592,9 @@ class ATMCSCsc(salobj.BaseCsc):
 
         # Handle M3 detent switch
         detent_map = {
-            SALPY_ATMCS.ATMCS_shared_M3State_Nasmyth1: "nasmyth1Active",
-            SALPY_ATMCS.ATMCS_shared_M3State_Nasmyth2: "nasmyth2Active",
-            SALPY_ATMCS.ATMCS_shared_M3State_Port3: "port3Active",
+            1: "nasmyth1Active",
+            2: "nasmyth2Active",
+            3: "port3Active",
         }
         at_field = detent_map.get(m3_state, None)
         detent_values = dict((field_name, field_name == at_field) for field_name in detent_map.values())
@@ -681,7 +679,6 @@ class ATMCSCsc(salobj.BaseCsc):
                 nasmyth2Encoder1Raw=axis_encoder_counts[Axis.NA2],
                 nasmyth2Encoder2Raw=axis_encoder_counts[Axis.NA2],
                 nasmyth2Encoder3Raw=axis_encoder_counts[Axis.NA2],
-                trackId=self.cmd_trackTarget.data.trackId,
             )
             self.tel_torqueDemand.set_put(
                 elevationMotorTorque=torque[Axis.Elevation],
