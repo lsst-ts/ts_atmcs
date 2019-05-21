@@ -23,6 +23,7 @@ import unittest
 
 from lsst.ts import salobj
 from lsst.ts import ATMCSSimulator
+from lsst.ts.idl.enums.ATMCS import AtMountState, M3ExitPort, M3State
 
 STD_TIMEOUT = 5  # standard timeout, seconds
 
@@ -160,7 +161,7 @@ class CscTestCase(unittest.TestCase):
                 state = await harness.remote.evt_summaryState.next(flush=False, timeout=5)
                 self.assertEqual(state.summaryState, salobj.State.ENABLED)
                 data = await harness.next_evt("atMountState")
-                self.assertEqual(data.state, 1)  # 1=TrackingDisabled
+                self.assertEqual(data.state, AtMountState.TRACKINGDISABLED)
 
                 # cannot send trackTarget while tracking disabled;
                 # this error does not change the summary state
@@ -175,16 +176,16 @@ class CscTestCase(unittest.TestCase):
                 # enable tracking and try again; this time it should work
                 await harness.remote.cmd_startTracking.start(timeout=STD_TIMEOUT)
                 data = await harness.next_evt("atMountState")
-                self.assertEqual(data.state, 2)  # 2=TrackingDisabled
+                self.assertEqual(data.state, AtMountState.TRACKINGENABLED)
                 await harness.remote.cmd_trackTarget.start(timeout=1)
                 await asyncio.sleep(0.1)
 
                 # disable tracking and re-enable, so state is TrackingEnabled
                 await harness.remote.cmd_stopTracking.start(timeout=STD_TIMEOUT)
                 data = await harness.next_evt("atMountState")
-                self.assertEqual(data.state, 3)  # 3=Stopping
+                self.assertEqual(data.state, AtMountState.STOPPING)
                 data = await harness.next_evt("atMountState")
-                self.assertEqual(data.state, 1)  # 1 = TrackingDisabled
+                self.assertEqual(data.state, AtMountState.TRACKINGDISABLED)
 
                 for axis in ATMCSSimulator.Axis:
                     if axis == ATMCSSimulator.Axis.M3:
@@ -192,7 +193,7 @@ class CscTestCase(unittest.TestCase):
                     with self.subTest(axis=axis):
                         await harness.remote.cmd_startTracking.start(timeout=STD_TIMEOUT)
                         data = await harness.next_evt("atMountState")
-                        self.assertEqual(data.state, 2)  # 2=TrackingDisabled
+                        self.assertEqual(data.state, AtMountState.TRACKINGENABLED)
 
                         pmin_kwargs = good_target_kwargs.copy()
                         pmin_kwargs[self.axis_names[axis]] = pmin_cmd[axis] - 0.000001
@@ -200,12 +201,12 @@ class CscTestCase(unittest.TestCase):
                         with salobj.assertRaisesAckError():
                             await harness.remote.cmd_trackTarget.start(timeout=1)
                         data = await harness.next_evt("atMountState", timeout=STD_TIMEOUT)
-                        self.assertEqual(data.state, 1)  # 1=TrackingDis
+                        self.assertEqual(data.state, AtMountState.TRACKINGDISABLED)
                         await self.fault_to_enabled(harness)
 
                         await harness.remote.cmd_startTracking.start(timeout=STD_TIMEOUT)
                         data = await harness.next_evt("atMountState")
-                        self.assertEqual(data.state, 2)  # 2=TrackingDisabled
+                        self.assertEqual(data.state, AtMountState.TRACKINGENABLED)
 
                         pmax_kwargs = good_target_kwargs.copy()
                         pmax_kwargs[self.axis_names[axis]] = pmax_cmd[axis] + 0.000001
@@ -213,12 +214,12 @@ class CscTestCase(unittest.TestCase):
                         with salobj.assertRaisesAckError():
                             await harness.remote.cmd_trackTarget.start(timeout=1)
                         data = await harness.next_evt("atMountState")
-                        self.assertEqual(data.state, 1)  # 1=TrackingDisabled
+                        self.assertEqual(data.state, AtMountState.TRACKINGDISABLED)
                         await self.fault_to_enabled(harness)
 
                         await harness.remote.cmd_startTracking.start(timeout=STD_TIMEOUT)
                         data = await harness.next_evt("atMountState")
-                        self.assertEqual(data.state, 2)  # 2=TrackingDisabled
+                        self.assertEqual(data.state, AtMountState.TRACKINGENABLED)
 
                         vmax_kwargs = good_target_kwargs.copy()
                         vmax_kwargs[f"{self.axis_names[axis]}Velocity"] = vmax[axis] + 0.000001
@@ -231,7 +232,7 @@ class CscTestCase(unittest.TestCase):
 
                 await harness.remote.cmd_startTracking.start(timeout=STD_TIMEOUT)
                 data = await harness.next_evt("atMountState")
-                self.assertEqual(data.state, 2)  # 2=TrackingDisabled
+                self.assertEqual(data.state, AtMountState.TRACKINGENABLED)
 
                 # a target that is (way) out of bounds at the specified time;
                 # failure puts the CSC into the FAULT state
@@ -326,13 +327,13 @@ class CscTestCase(unittest.TestCase):
                 data = await harness.next_evt("m3State")
                 self.assertEqual(data.state, 1)  # 1=Nasmyth1
 
-                harness.remote.cmd_setInstrumentPort.set(port=3)  # 3=Port3
+                harness.remote.cmd_setInstrumentPort.set(port=M3ExitPort.PORT3)
                 await harness.remote.cmd_setInstrumentPort.start(timeout=STD_TIMEOUT)
 
                 data = await harness.next_evt("m3PortSelected")
-                self.assertEqual(data.selected, 3)  # 3=Port3
+                self.assertEqual(data.selected, M3ExitPort.PORT3)
                 data = await harness.next_evt("m3State")
-                self.assertEqual(data.state, 4)  # 4=InMotion
+                self.assertEqual(data.state, M3State.INMOTION)
 
                 t0 = ATMCSSimulator.curr_tai()
 
@@ -348,7 +349,7 @@ class CscTestCase(unittest.TestCase):
 
                 data = await harness.next_evt("m3State", timeout=5)
                 print(f"test_set_instrument_port M3 rotation took {ATMCSSimulator.curr_tai() - t0:0.2f} sec")
-                self.assertEqual(data.state, 3)  # 3=Port3
+                self.assertEqual(data.state, M3ExitPort.PORT3)
 
         asyncio.get_event_loop().run_until_complete(doit())
 
@@ -378,7 +379,7 @@ class CscTestCase(unittest.TestCase):
                 await harness.remote.cmd_startTracking.start(timeout=STD_TIMEOUT)
 
                 data = await harness.next_evt("atMountState")
-                self.assertEqual(data.state, 2)  # 2=TrackingDisabled
+                self.assertEqual(data.state, AtMountState.TRACKINGENABLED)
 
                 # attempts to set instrument port should fail
                 with salobj.assertRaisesAckError():
@@ -446,22 +447,22 @@ class CscTestCase(unittest.TestCase):
                 self.assertEqual(state.summaryState, salobj.State.ENABLED)
 
                 data = await harness.next_evt("atMountState")
-                self.assertEqual(data.state, 1)  # 1=TrackingDisabled
+                self.assertEqual(data.state, AtMountState.TRACKINGDISABLED)
 
                 await harness.remote.cmd_startTracking.start(timeout=STD_TIMEOUT)
                 data = await harness.next_evt("atMountState")
-                self.assertEqual(data.state, 2)  # 2=TrackingDisabled
+                self.assertEqual(data.state, AtMountState.TRACKINGENABLED)
 
                 # wait too long for trackTarget
                 data = await harness.next_evt("atMountState", timeout=max_tracking_interval + 0.2)
-                self.assertEqual(data.state, 1)  # 1=TrackingDisabled
+                self.assertEqual(data.state, AtMountState.TRACKINGDISABLED)
                 await self.fault_to_enabled(harness)
 
                 # try again, and this time send a trackTarget command
                 # before waiting too long
                 await harness.remote.cmd_startTracking.start(timeout=STD_TIMEOUT)
                 data = await harness.next_evt("atMountState")
-                self.assertEqual(data.state, 2)  # 2=TrackingDisabled
+                self.assertEqual(data.state, AtMountState.TRACKINGENABLED)
 
                 harness.remote.cmd_trackTarget.set(
                     elevation=10,
@@ -472,10 +473,10 @@ class CscTestCase(unittest.TestCase):
 
                 # wait too long for trackTarget
                 data = await harness.next_evt("atMountState", timeout=max_tracking_interval + 0.2)
-                self.assertEqual(data.state, 3)  # 3=Stopping
+                self.assertEqual(data.state, AtMountState.STOPPING)
 
                 data = await harness.next_evt("atMountState", timeout=STD_TIMEOUT)
-                self.assertEqual(data.state, 1)  # 1=TrackingDisabled
+                self.assertEqual(data.state, AtMountState.TRACKINGDISABLED)
 
         asyncio.get_event_loop().run_until_complete(doit())
 
@@ -487,11 +488,11 @@ class CscTestCase(unittest.TestCase):
                 state = await harness.remote.evt_summaryState.next(flush=False, timeout=5)
                 self.assertEqual(state.summaryState, salobj.State.ENABLED)
                 data = await harness.next_evt("atMountState")
-                self.assertEqual(data.state, 1)  # 1=TrackingDisabled
+                self.assertEqual(data.state, AtMountState.TRACKINGDISABLED)
 
                 await harness.remote.cmd_startTracking.start(timeout=STD_TIMEOUT)
                 data = await harness.next_evt("atMountState")
-                self.assertEqual(data.state, 2)  # 2=TrackingDisabled
+                self.assertEqual(data.state, AtMountState.TRACKINGENABLED)
 
                 t0 = ATMCSSimulator.curr_tai()
                 paths = dict(
@@ -517,7 +518,7 @@ class CscTestCase(unittest.TestCase):
 
                 await harness.remote.cmd_stopTracking.start(timeout=1)
                 data = await harness.next_evt("atMountState")
-                self.assertEqual(data.state, 3)  # 3=Stopping
+                self.assertEqual(data.state, AtMountState.STOPPING)
 
                 await asyncio.sleep(0.2)  # give events time to arrive
 
@@ -544,11 +545,11 @@ class CscTestCase(unittest.TestCase):
                 state = await harness.remote.evt_summaryState.next(flush=False, timeout=5)
                 self.assertEqual(state.summaryState, salobj.State.ENABLED)
                 data = await harness.next_evt("atMountState", timeout=STD_TIMEOUT)
-                self.assertEqual(data.state, 1)  # 1=TrackingDisabled
+                self.assertEqual(data.state, AtMountState.TRACKINGDISABLED)
 
                 await harness.remote.cmd_startTracking.start(timeout=STD_TIMEOUT)
                 data = await harness.next_evt("atMountState", timeout=STD_TIMEOUT)
-                self.assertEqual(data.state, 2)  # 2=TrackingDisabled
+                self.assertEqual(data.state, AtMountState.TRACKINGENABLED)
 
                 t0 = ATMCSSimulator.curr_tai()
                 paths = dict(
@@ -574,7 +575,7 @@ class CscTestCase(unittest.TestCase):
 
                 await harness.remote.cmd_disable.start(timeout=1)
                 data = await harness.next_evt("atMountState", timeout=STD_TIMEOUT)
-                self.assertEqual(data.state, 3)  # 3=Stopping
+                self.assertEqual(data.state, AtMountState.STOPPING)
 
                 await asyncio.sleep(0.2)  # give events time to arrive
 
@@ -586,7 +587,7 @@ class CscTestCase(unittest.TestCase):
                         self.assertFalse(data.inPosition)
 
                 data = await harness.next_evt("atMountState", timeout=STD_TIMEOUT)
-                self.assertEqual(data.state, 1)  # 1=TrackingDisabled
+                self.assertEqual(data.state, AtMountState.TRACKINGDISABLED)
 
         asyncio.get_event_loop().run_until_complete(doit())
 

@@ -27,6 +27,7 @@ import enum
 import numpy as np
 
 from lsst.ts import salobj
+from lsst.ts.idl.enums.ATMCS import AtMountState, M3ExitPort
 from . import path
 from .actuator import Actuator, curr_tai
 
@@ -92,9 +93,9 @@ class ATMCSCsc(salobj.BaseCsc):
         self._disable_all_drives_task = None
         """Task that runs while axes are halting before being disabled."""
         self._port_info_dict = {
-            1: (0, 1),  # 1 = Nasmyth1
-            2: (1, 2),  # 2 = Nasmyth2
-            3: (2, 3),  # 3 = Port3
+            M3ExitPort.NASMYTH1: (0, M3ExitPort.NASMYTH1),
+            M3ExitPort.NASMYTH2: (1, M3ExitPort.NASMYTH2),
+            M3ExitPort.PORT3: (2, M3ExitPort.PORT3),
         }
         """Dict of port enum: (port_az index, M3State enum constant)"""
 
@@ -522,12 +523,12 @@ class ATMCSCsc(salobj.BaseCsc):
 
         # Handle atMountState
         if self._tracking_enabled:
-            mount_state = 2  # 2 = TrackingEnabled
+            mount_state = AtMountState.TRACKINGENABLED
         elif (self._stop_tracking_task is not None and not self._stop_tracking_task.done()) \
                 or (self._disable_all_drives_task is not None and not self._disable_all_drives_task.done()):
-            mount_state = 3  # 3 = Stopping
+            mount_state = AtMountState.STOPPING
         else:
-            mount_state = 1  # 1 = TrackingDisabled
+            mount_state = AtMountState.TRACKINGDISABLED
         self.evt_atMountState.set_put(state=mount_state)
 
         # Handle azimuth topple block
