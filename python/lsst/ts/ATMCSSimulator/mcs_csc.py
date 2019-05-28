@@ -160,13 +160,9 @@ class ATMCSCsc(salobj.BaseCsc):
         This remains true until stopTracking is called or the
         summary state is no longer salobj.State.Enabled,
         or the axis runs into a limit.
-        """
 
-        self._axis_braked = np.zeros([5], dtype=bool)
-        """If True the axis has its brakes (if any) applied
-
-        In this state _axis_enabled should be False
-        and the actuator should be halted.
+        Note that the brakes automatically come on/off
+        if the axis is disabled/enabled, respectively.
         """
 
         self._kill_tracking_timer = None
@@ -397,7 +393,6 @@ class ATMCSCsc(salobj.BaseCsc):
             actuator = self.actuators[axis]
             if actuator.kind(t0) == path.Kind.Stopped:
                 self._axis_enabled[axis] = False
-                self._axis_braked[axis] = True
             else:
                 already_stopped = False
                 actuator.stop()
@@ -418,7 +413,6 @@ class ATMCSCsc(salobj.BaseCsc):
             await asyncio.sleep(dt)
         for axis in Axis:
             self._axis_enabled[axis] = False
-            self._axis_braked[axis] = True
         asyncio.ensure_future(self._run_update_events())
 
     async def _finish_stop_tracking(self):
@@ -510,12 +504,11 @@ class ATMCSCsc(salobj.BaseCsc):
             pos = min(pos, self.pmax_lim[axis] + self.limit_overtravel)
             self.actuators[axis].abort(t=t, pos=pos)
             self._axis_enabled[axis] = False
-            self._axis_braked[axis] = True
 
         # Handle brakes
         for axis in Axis:
             for brake_name in self._brake_names[axis]:
-                self.set_event(brake_name, engaged=self._axis_braked[axis])
+                self.set_event(brake_name, engaged=not self._axis_enabled[axis])
 
         # Handle drive status (which means enabled)
         for axis in Axis:
@@ -552,7 +545,7 @@ class ATMCSCsc(salobj.BaseCsc):
         self.evt_m3InPosition.set_put(inPosition=m3_in_position)
 
         # Handle "in position" events for the main axes.
-        # Main axes are in position if enabled, the brakes are off,
+        # Main axes are in position if enabled
         # and actuator.kind(t) is tracking.
         if not self._tracking_enabled:
             for axis in MainAxes:
@@ -561,7 +554,7 @@ class ATMCSCsc(salobj.BaseCsc):
         else:
             all_in_position = m3_in_position
             for axis in MainAxes:
-                if self._axis_braked[axis] or not self._axis_enabled[axis]:
+                if not self._axis_enabled[axis]:
                     in_position = False
                 else:
                     kind = self.actuators[axis].kind(t)
@@ -625,7 +618,6 @@ class ATMCSCsc(salobj.BaseCsc):
         if self.summary_state == salobj.State.ENABLED:
             for axis in Axis:
                 self._axis_enabled[axis] = True
-                self._axis_braked[axis] = False
         else:
             self.disable_all_drives()
         if self.summary_state in (salobj.State.DISABLED, salobj.State.ENABLED):
