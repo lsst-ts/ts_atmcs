@@ -227,7 +227,7 @@ class CscTestCase(unittest.TestCase):
                         with salobj.assertRaisesAckError():
                             await harness.remote.cmd_trackTarget.start(timeout=1)
                         data = await harness.next_evt("atMountState", timeout=STD_TIMEOUT)
-                        self.assertEqual(data.state, 1)  # 1=TrackingDisabled
+                        self.assertEqual(data.state, AtMountState.TRACKINGDISABLED)
                         await self.fault_to_enabled(harness)
 
                 await harness.remote.cmd_startTracking.start(timeout=STD_TIMEOUT)
@@ -243,7 +243,7 @@ class CscTestCase(unittest.TestCase):
                 with salobj.assertRaisesAckError():
                     await harness.remote.cmd_trackTarget.start(timeout=1)
                 data = await harness.next_evt("atMountState")
-                self.assertEqual(data.state, 1)  # 1=TrackingDisabled
+                self.assertEqual(data.state, AtMountState.TRACKINGDISABLED)
                 await self.fault_to_enabled(harness)
 
         asyncio.get_event_loop().run_until_complete(doit())
@@ -325,7 +325,7 @@ class CscTestCase(unittest.TestCase):
                 self.assertEqual(state.summaryState, salobj.State.ENABLED)
 
                 data = await harness.next_evt("m3State")
-                self.assertEqual(data.state, 1)  # 1=Nasmyth1
+                self.assertEqual(data.state, M3State.NASMYTH1)
 
                 harness.remote.cmd_setInstrumentPort.set(port=M3ExitPort.PORT3)
                 await harness.remote.cmd_setInstrumentPort.start(timeout=STD_TIMEOUT)
@@ -364,7 +364,7 @@ class CscTestCase(unittest.TestCase):
                 self.assertEqual(state.summaryState, salobj.State.ENABLED)
 
                 data = await harness.next_evt("atMountState")
-                self.assertEqual(data.state, 1)  # 1=TrackingDisabled
+                self.assertEqual(data.state, AtMountState.TRACKINGDISABLED)
 
                 for evt_name in self.in_position_names:
                     data = await harness.next_evt(evt_name)
@@ -530,7 +530,7 @@ class CscTestCase(unittest.TestCase):
                         self.assertFalse(data.inPosition)
 
                 data = await harness.next_evt("atMountState", timeout=STD_TIMEOUT)
-                self.assertEqual(data.state, 1)  # 1=TrackingDisabled
+                self.assertEqual(data.state, AtMountState.TRACKINGDISABLED)
 
                 for actuator in harness.csc.actuators:
                     self.assertEqual(actuator.kind(), ATMCSSimulator.path.Kind.Stopped)

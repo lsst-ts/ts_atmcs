@@ -27,7 +27,7 @@ import enum
 import numpy as np
 
 from lsst.ts import salobj
-from lsst.ts.idl.enums.ATMCS import AtMountState, M3ExitPort
+from lsst.ts.idl.enums.ATMCS import AtMountState, M3ExitPort, M3State
 from . import path
 from .actuator import Actuator, curr_tai
 
@@ -93,11 +93,11 @@ class ATMCSCsc(salobj.BaseCsc):
         self._disable_all_drives_task = None
         """Task that runs while axes are halting before being disabled."""
         self._port_info_dict = {
-            M3ExitPort.NASMYTH1: (0, M3ExitPort.NASMYTH1),
-            M3ExitPort.NASMYTH2: (1, M3ExitPort.NASMYTH2),
-            M3ExitPort.PORT3: (2, M3ExitPort.PORT3),
+            M3ExitPort.NASMYTH1: (0, M3State.NASMYTH1),
+            M3ExitPort.NASMYTH2: (1, M3State.NASMYTH2),
+            M3ExitPort.PORT3: (2, M3State.PORT3),
         }
-        """Dict of port enum: (port_az index, M3State enum constant)"""
+        """Dict of M3ExitPort enum: (port_az index, M3State enum)"""
 
         self._min_lim_names = (
             "elevationLimitSwitchLower",
@@ -360,6 +360,7 @@ class ATMCSCsc(salobj.BaseCsc):
             raise RuntimeError(f"Bug! invalid port_az_ind={port_az_ind} for port={port}")
         self.actuators[Axis.M3].set_cmd(pos=port_az, vel=0, t=curr_tai())
         self.evt_m3PortSelected.set_put(selected=port)
+        # enable/disable rotator axes accordingly
 
     async def do_stopTracking(self, data):
         self.assert_enabled("stopTracking")
@@ -581,11 +582,11 @@ class ATMCSCsc(salobj.BaseCsc):
                     break
             else:
                 # Move is finished, but not at a known point
-                m3_state = 5  # 5 = UnknownPosition
+                m3_state = M3State.UNKNOWNPOSITION
         elif m3actuator.kind(t) == path.Kind.Slewing:
-            m3_state = 4  # 4 = InMotion
+            m3_state = M3State.INMOTION
         else:
-            m3_state = 5  # 5 = UnknownPosition
+            m3_state = M3State.UNKNOWNPOSITION
         assert m3_state is not None
 
         # handle m3State
