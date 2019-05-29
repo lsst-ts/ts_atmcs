@@ -310,7 +310,7 @@ class CscTestCase(unittest.TestCase):
                 state = await harness.remote.evt_summaryState.next(flush=False, timeout=STD_TIMEOUT)
                 self.assertEqual(state.summaryState, salobj.State.OFFLINE)
 
-                await asyncio.wait_for(harness.csc.done_task, 2)
+                await asyncio.wait_for(harness.csc.done_task, 5)
 
         asyncio.get_event_loop().run_until_complete(doit())
 
