@@ -227,7 +227,7 @@ class CscTestCase(unittest.TestCase):
                         with salobj.assertRaisesAckError():
                             await harness.remote.cmd_trackTarget.start(timeout=1)
                         data = await harness.next_evt("atMountState", timeout=STD_TIMEOUT)
-                        self.assertEqual(data.state, 1)  # 1=TrackingDisabled
+                        self.assertEqual(data.state, AtMountState.TRACKINGDISABLED)
                         await self.fault_to_enabled(harness)
 
                 await harness.remote.cmd_startTracking.start(timeout=STD_TIMEOUT)
@@ -243,7 +243,7 @@ class CscTestCase(unittest.TestCase):
                 with salobj.assertRaisesAckError():
                     await harness.remote.cmd_trackTarget.start(timeout=1)
                 data = await harness.next_evt("atMountState")
-                self.assertEqual(data.state, 1)  # 1=TrackingDisabled
+                self.assertEqual(data.state, AtMountState.TRACKINGDISABLED)
                 await self.fault_to_enabled(harness)
 
         asyncio.get_event_loop().run_until_complete(doit())
@@ -276,11 +276,17 @@ class CscTestCase(unittest.TestCase):
                 state = await harness.remote.evt_summaryState.next(flush=False, timeout=STD_TIMEOUT)
                 self.assertEqual(state.summaryState, salobj.State.ENABLED)
 
+                # the following axes should be enabled:
+                # elevation, azimuth and NA2
                 for evt_name in self.brake_names:
+                    if evt_name == "nasmyth2Brake":
+                        continue
                     data = await harness.next_evt(evt_name)
                     self.assertFalse(data.engaged)
 
                 for evt_name in self.enable_names:
+                    if evt_name in ("nasmyth2DriveStatus", "m3DriveStatus"):
+                        continue
                     data = await harness.next_evt(evt_name)
                     self.assertTrue(data.enable)
 
@@ -291,10 +297,14 @@ class CscTestCase(unittest.TestCase):
                 self.assertEqual(state.summaryState, salobj.State.DISABLED)
 
                 for evt_name in self.brake_names:
+                    if evt_name == "nasmyth2Brake":
+                        continue
                     data = await harness.next_evt(evt_name)
                     self.assertTrue(data.engaged)
 
                 for evt_name in self.enable_names:
+                    if evt_name in ("nasmyth2DriveStatus", "m3DriveStatus"):
+                        continue
                     data = await harness.next_evt(evt_name)
                     self.assertFalse(data.enable)
 
@@ -310,7 +320,7 @@ class CscTestCase(unittest.TestCase):
                 state = await harness.remote.evt_summaryState.next(flush=False, timeout=STD_TIMEOUT)
                 self.assertEqual(state.summaryState, salobj.State.OFFLINE)
 
-                await asyncio.wait_for(harness.csc.done_task, 2)
+                await asyncio.wait_for(harness.csc.done_task, 5)
 
         asyncio.get_event_loop().run_until_complete(doit())
 
@@ -325,15 +335,21 @@ class CscTestCase(unittest.TestCase):
                 self.assertEqual(state.summaryState, salobj.State.ENABLED)
 
                 data = await harness.next_evt("m3State")
-                self.assertEqual(data.state, 1)  # 1=Nasmyth1
+                self.assertEqual(data.state, M3State.NASMYTH1)
 
-                harness.remote.cmd_setInstrumentPort.set(port=M3ExitPort.PORT3)
-                await harness.remote.cmd_setInstrumentPort.start(timeout=STD_TIMEOUT)
+                await harness.remote.cmd_setInstrumentPort.set_start(port=M3ExitPort.PORT3,
+                                                                     timeout=STD_TIMEOUT)
 
                 data = await harness.next_evt("m3PortSelected")
                 self.assertEqual(data.selected, M3ExitPort.PORT3)
                 data = await harness.next_evt("m3State")
                 self.assertEqual(data.state, M3State.INMOTION)
+
+                # neither rotator should be enabled
+                data = harness.remote.evt_nasmyth1DriveStatus.get(flush=True)
+                self.assertFalse(data.enable)
+                data = harness.remote.evt_nasmyth2DriveStatus.get(flush=True)
+                self.assertFalse(data.enable)
 
                 t0 = ATMCSSimulator.curr_tai()
 
@@ -347,9 +363,38 @@ class CscTestCase(unittest.TestCase):
                 curr_pos, curr_vel = actuator.curr.pva(ATMCSSimulator.curr_tai())[0:2]
                 self.assertNotEqual(curr_vel, 0)
 
+                # M3 is pointing to Port 3; neither rotator should be enabled
                 data = await harness.next_evt("m3State", timeout=5)
                 print(f"test_set_instrument_port M3 rotation took {ATMCSSimulator.curr_tai() - t0:0.2f} sec")
-                self.assertEqual(data.state, M3ExitPort.PORT3)
+                self.assertEqual(data.state, M3State.PORT3)
+                data = harness.remote.evt_nasmyth1DriveStatus.get(flush=True)
+                self.assertFalse(data.enable)
+                data = harness.remote.evt_nasmyth2DriveStatus.get(flush=True)
+                self.assertFalse(data.enable)
+
+                await harness.remote.cmd_setInstrumentPort.set_start(port=M3ExitPort.NASMYTH2,
+                                                                     timeout=STD_TIMEOUT)
+
+                t0 = ATMCSSimulator.curr_tai()
+                data = await harness.next_evt("m3State", timeout=2)
+                self.assertEqual(data.state, M3State.INMOTION)
+
+                # neither rotator should be enabled
+                data = harness.remote.evt_nasmyth1DriveStatus.get(flush=True)
+                self.assertFalse(data.enable)
+                data = harness.remote.evt_nasmyth2DriveStatus.get(flush=True)
+                self.assertFalse(data.enable)
+
+                data = await harness.next_evt("m3State", timeout=5)
+                print(f"test_set_instrument_port M3 rotation took {ATMCSSimulator.curr_tai() - t0:0.2f} sec")
+                self.assertEqual(data.state, M3State.NASMYTH2)
+
+                # M3 is pointing to Nasmyth2; that rotator
+                # should be enabled and Nasmyth1 should not
+                data = await harness.next_evt("nasmyth2DriveStatus")
+                self.assertTrue(data.enable)
+                data = harness.remote.evt_nasmyth1DriveStatus.get()
+                self.assertFalse(data.enable)
 
         asyncio.get_event_loop().run_until_complete(doit())
 
@@ -364,7 +409,10 @@ class CscTestCase(unittest.TestCase):
                 self.assertEqual(state.summaryState, salobj.State.ENABLED)
 
                 data = await harness.next_evt("atMountState")
-                self.assertEqual(data.state, 1)  # 1=TrackingDisabled
+                self.assertEqual(data.state, AtMountState.TRACKINGDISABLED)
+
+                data = await harness.next_evt("m3State")
+                self.assertEqual(data.state, M3State.NASMYTH1)
 
                 for evt_name in self.in_position_names:
                     data = await harness.next_evt(evt_name)
@@ -391,7 +439,6 @@ class CscTestCase(unittest.TestCase):
                     elevation=ATMCSSimulator.path.TPVAJ(t0=t0, p0=6, v0=0.001),
                     azimuth=ATMCSSimulator.path.TPVAJ(t0=t0, p0=5, v0=-0.001),
                     nasmyth1RotatorAngle=ATMCSSimulator.path.TPVAJ(t0=t0, p0=1, v0=-0.001),
-                    nasmyth2RotatorAngle=ATMCSSimulator.path.TPVAJ(t0=t0, p0=-2, v0=0.001),
                 )
                 trackId = 20  # arbitary
                 while True:
@@ -426,6 +473,8 @@ class CscTestCase(unittest.TestCase):
                 for evt_name in self.in_position_names:
                     if evt_name.startswith("m3"):
                         continue  # already was in position
+                    if evt_name.startswith("nasmyth2"):
+                        continue  # axis not in use
                     data = await harness.next_evt(evt_name)
                     self.assertTrue(data.inPosition)
 
@@ -448,6 +497,9 @@ class CscTestCase(unittest.TestCase):
 
                 data = await harness.next_evt("atMountState")
                 self.assertEqual(data.state, AtMountState.TRACKINGDISABLED)
+
+                data = await harness.next_evt("m3State")
+                self.assertEqual(data.state, M3State.NASMYTH1)
 
                 await harness.remote.cmd_startTracking.start(timeout=STD_TIMEOUT)
                 data = await harness.next_evt("atMountState")
@@ -490,6 +542,9 @@ class CscTestCase(unittest.TestCase):
                 data = await harness.next_evt("atMountState")
                 self.assertEqual(data.state, AtMountState.TRACKINGDISABLED)
 
+                data = await harness.next_evt("m3State")
+                self.assertEqual(data.state, M3State.NASMYTH1)
+
                 await harness.remote.cmd_startTracking.start(timeout=STD_TIMEOUT)
                 data = await harness.next_evt("atMountState")
                 self.assertEqual(data.state, AtMountState.TRACKINGENABLED)
@@ -499,7 +554,6 @@ class CscTestCase(unittest.TestCase):
                     elevation=ATMCSSimulator.path.TPVAJ(t0=t0, p0=45),
                     azimuth=ATMCSSimulator.path.TPVAJ(t0=t0, p0=100),
                     nasmyth1RotatorAngle=ATMCSSimulator.path.TPVAJ(t0=t0, p0=90),
-                    nasmyth2RotatorAngle=ATMCSSimulator.path.TPVAJ(t0=t0, p0=-90),
                 )
                 trackId = 35  # arbitary
 
@@ -530,7 +584,7 @@ class CscTestCase(unittest.TestCase):
                         self.assertFalse(data.inPosition)
 
                 data = await harness.next_evt("atMountState", timeout=STD_TIMEOUT)
-                self.assertEqual(data.state, 1)  # 1=TrackingDisabled
+                self.assertEqual(data.state, AtMountState.TRACKINGDISABLED)
 
                 for actuator in harness.csc.actuators:
                     self.assertEqual(actuator.kind(), ATMCSSimulator.path.Kind.Stopped)
@@ -556,7 +610,6 @@ class CscTestCase(unittest.TestCase):
                     elevation=ATMCSSimulator.path.TPVAJ(t0=t0, p0=45),
                     azimuth=ATMCSSimulator.path.TPVAJ(t0=t0, p0=100),
                     nasmyth1RotatorAngle=ATMCSSimulator.path.TPVAJ(t0=t0, p0=90),
-                    nasmyth2RotatorAngle=ATMCSSimulator.path.TPVAJ(t0=t0, p0=-90),
                 )
                 trackId = 35  # arbitary
 
