@@ -86,11 +86,11 @@ class ATMCSCsc(salobj.BaseCsc):
                          initial_simulation_mode=initial_simulation_mode)
         self.telemetry_interval = 0.1
         """Interval between telemetry updates (sec)"""
-        self._telemetry_task = None
+        self._telemetry_task = salobj.make_done_future()
         """Task that runs while the telemetry loop sleeps."""
-        self._stop_tracking_task = None
+        self._stop_tracking_task = salobj.make_done_future()
         """Task that runs while axes are slewing due to stopTracking."""
-        self._disable_all_drives_task = None
+        self._disable_all_drives_task = salobj.make_done_future()
         """Task that runs while axes are halting before being disabled."""
         self._port_info_dict = {
             M3ExitPort.NASMYTH1: (0, M3State.NASMYTH1),
@@ -165,12 +165,23 @@ class ATMCSCsc(salobj.BaseCsc):
         if the axis is disabled/enabled, respectively.
         """
 
-        self._kill_tracking_timer = None
+        self._kill_tracking_timer = salobj.make_done_future()
         """Timer to kill tracking if trackTarget doesn't arrive in time.
         """
 
         self.configure()
         # note: initial events are output by report_summary_state
+
+    async def close_tasks(self):
+        await super().close_tasks()
+        if not self._disable_all_drives_task.done():
+            self._disable_all_drives_task.cancel()
+        if not self._stop_tracking_task.done():
+            self._stop_tracking_task.cancel()
+        if not self._telemetry_task.done():
+            self._telemetry_task.cancel()
+        if not self._kill_tracking_timer.done():
+            self._kill_tracking_timer.cancel()
 
     def configure(self,
                   max_tracking_interval=2.5,
@@ -286,7 +297,7 @@ class ATMCSCsc(salobj.BaseCsc):
         self.assert_enabled("startTracking")
         if not self.evt_m3InPosition.data.inPosition:
             raise salobj.ExpectedError("Cannot startTracking until M3 is at a known position")
-        if self._stop_tracking_task and not self._stop_tracking_task.done():
+        if not self._stop_tracking_task.done():
             raise salobj.ExpectedError("stopTracking not finished yet")
         self._tracking_enabled = True
         self.update_events()
@@ -336,7 +347,7 @@ class ATMCSCsc(salobj.BaseCsc):
         restart : `bool`
             If True then start or restart the tracking timer, else stop it.
         """
-        if self._kill_tracking_timer and not self._kill_tracking_timer.done():
+        if not self._kill_tracking_timer.done():
             self._kill_tracking_timer.cancel()
         if restart:
             self._kill_tracking_timer = asyncio.ensure_future(self.kill_tracking())
@@ -360,13 +371,13 @@ class ATMCSCsc(salobj.BaseCsc):
 
     async def do_stopTracking(self, data):
         self.assert_enabled("stopTracking")
-        if self._stop_tracking_task and not self._stop_tracking_task.done():
+        if not self._stop_tracking_task.done():
             raise salobj.ExpectedError("Already stopping")
         self._set_tracking_timer(restart=False)
         self._tracking_enabled = False
         for axis in MainAxes:
             self.actuators[axis].stop()
-        if self._stop_tracking_task is not None and not self._stop_tracking_task.done():
+        if not self._stop_tracking_task.done():
             self._stop_tracking_task.cancel()
         self._stop_tracking_task = asyncio.ensure_future(self._finish_stop_tracking())
         self.update_events()
@@ -396,7 +407,7 @@ class ATMCSCsc(salobj.BaseCsc):
             else:
                 already_stopped = False
                 actuator.stop()
-        if self._disable_all_drives_task is not None and not self._disable_all_drives_task:
+        if not self._disable_all_drives_task.done():
             self._disable_all_drives_task.cancel()
         if not already_stopped:
             self._disable_all_drives_task = asyncio.ensure_future(self._finish_disable_all_drives())
@@ -518,8 +529,7 @@ class ATMCSCsc(salobj.BaseCsc):
         # Handle atMountState
         if self._tracking_enabled:
             mount_state = AtMountState.TRACKINGENABLED
-        elif (self._stop_tracking_task is not None and not self._stop_tracking_task.done()) \
-                or (self._disable_all_drives_task is not None and not self._disable_all_drives_task.done()):
+        elif not self._stop_tracking_task.done() or not self._disable_all_drives_task.done():
             mount_state = AtMountState.STOPPING
         else:
             mount_state = AtMountState.TRACKINGDISABLED
@@ -621,7 +631,10 @@ class ATMCSCsc(salobj.BaseCsc):
         else:
             self.disable_all_drives()
         if self.summary_state in (salobj.State.DISABLED, salobj.State.ENABLED):
-            asyncio.ensure_future(self.telemetry_loop())
+            if self._telemetry_task.done():
+                self._telemetry_task = asyncio.ensure_future(self.telemetry_loop())
+        elif not self._telemetry_task.done():
+            self._telemetry_task.cancel()
 
     async def telemetry_loop(self):
         """Output telemetry and events that have changed
@@ -638,8 +651,6 @@ class ATMCSCsc(salobj.BaseCsc):
 
         See `update_events` for the events that are output.
         """
-        if self._telemetry_task is not None and not self._telemetry_task.done():
-            self._telemetry_task.cancel()
         while self.summary_state in (salobj.State.DISABLED, salobj.State.ENABLED):
             # update events first so that limits are handled
             self.update_events()
@@ -707,5 +718,4 @@ class ATMCSCsc(salobj.BaseCsc):
                 nasmyth1EncoderRaw=motor_encoder_counts[Axis.NA1],
                 nasmyth2EncoderRaw=motor_encoder_counts[Axis.NA2],
             )
-            self._telemetry_task = asyncio.ensure_future(asyncio.sleep(self.telemetry_interval))
-            await self._telemetry_task
+            await asyncio.sleep(self.telemetry_interval)
