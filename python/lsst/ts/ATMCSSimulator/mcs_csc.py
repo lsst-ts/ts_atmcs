@@ -97,7 +97,12 @@ class ATMCSCsc(salobj.BaseCsc):
             M3ExitPort.NASMYTH2: (1, M3State.NASMYTH2, Axis.NA2),
             M3ExitPort.PORT3: (2, M3State.PORT3, None),
         }
-        """Dict of M3ExitPort: (port_az index, M3State, Axis or None)"""
+        """Dict of M3ExitPort (the instrument port M3 points to): tuple of:
+        * index of self.m3_port_pos: the M3 position for this port
+        * M3State (state of M3 axis when pointing to this port)
+        * Rotator axis at this port, as an Axis enum,
+          or None if this port has no rotator.
+        """
 
         self._min_lim_names = (
             "elevationLimitSwitchLower",
@@ -192,7 +197,7 @@ class ATMCSCsc(salobj.BaseCsc):
                   vmax=(5, 5, 5, 5, 5),
                   amax=(3, 3, 3, 3, 3),
                   topple_az=(2, 5),
-                  port_az=(0, 180, 90),
+                  m3_port_pos=(0, 180, 90),
                   needed_in_pos=3,
                   axis_encoder_counts_per_deg=(3.6e6, 3.6e6, 3.6e6, 3.6e6, 3.6e6),
                   motor_encoder_counts_per_deg=(3.6e5, 3.6e5, 3.6e5, 3.6e5, 3.6e5),
@@ -221,8 +226,9 @@ class ATMCSCsc(salobj.BaseCsc):
             Maximum acceleration of each axis, in deg/sec
         topple_az : ``iterable`` of 2 `float`
             Min, max azimuth at which the topple block moves, in deg
-        port_az : ``iterable`` of 3 `float`
-            Position of each instrument port: NA1, NA2 and Port3
+        m3_port_pos : ``iterable`` of 3 `float`
+            M3 position of instrument ports NA1, NA2 and Port3,
+            in that order.
         axis_encoder_counts_per_deg : `list` [`float`]
             Axis encoder resolution, for each axis_, in counts/deg
         motor_encoder_counts_per_deg : `list` [`float`]
@@ -257,7 +263,7 @@ class ATMCSCsc(salobj.BaseCsc):
         if amax.min() <= 0:
             raise salobj.ExpectedError(f"amax={amax}; all values must be positive")
         topple_az = convert_values("topple_az", topple_az, 2)
-        port_az = convert_values("port_az", port_az, 3)
+        m3_port_pos = convert_values("m3_port_pos", m3_port_pos, 3)
         axis_encoder_counts_per_deg = convert_values("axis_encoder_counts_per_deg",
                                                      axis_encoder_counts_per_deg, 5)
         motor_encoder_counts_per_deg = convert_values("motor_encoder_counts_per_deg",
@@ -274,7 +280,7 @@ class ATMCSCsc(salobj.BaseCsc):
         self.pmax_lim = pmax_lim
         self.vmax = vmax
         self.topple_az = topple_az
-        self.port_az = port_az
+        self.m3_port_pos = m3_port_pos
         self.axis_encoder_counts_per_deg = axis_encoder_counts_per_deg
         self.motor_encoder_counts_per_deg = motor_encoder_counts_per_deg
         self.motor_axis_ratio = motor_axis_ratio
@@ -358,19 +364,19 @@ class ATMCSCsc(salobj.BaseCsc):
             raise salobj.ExpectedError("Cannot setInstrumentPort while tracking is enabled")
         port = data.port
         try:
-            port_az_ind = self._port_info_dict[port][0]
+            m3_port_pos_ind = self._port_info_dict[port][0]
         except IndexError:
             raise salobj.ExpectedError(f"Invalid port={port}")
         try:
-            port_az = self.port_az[port_az_ind]
+            m3_port_pos = self.m3_port_pos[m3_port_pos_ind]
         except IndexError:
-            raise RuntimeError(f"Bug! invalid port_az_ind={port_az_ind} for port={port}")
+            raise RuntimeError(f"Bug! invalid m3_port_pos_ind={m3_port_pos_ind} for port={port}")
         self.evt_m3PortSelected.set_put(selected=port)
         m3actuator = self.actuators[Axis.M3]
-        if m3actuator.cmd.p0 == port_az and self.evt_m3InPosition.data.inPosition:
+        if m3actuator.cmd.p0 == m3_port_pos and self.evt_m3InPosition.data.inPosition:
             # already there; don't do anything
             return
-        self.actuators[Axis.M3].set_cmd(pos=port_az, vel=0, t=curr_tai())
+        self.actuators[Axis.M3].set_cmd(pos=m3_port_pos, vel=0, t=curr_tai())
         self._axis_enabled[Axis.NA1] = False
         self._axis_enabled[Axis.NA2] = False
         self.update_events()
@@ -580,8 +586,8 @@ class ATMCSCsc(salobj.BaseCsc):
                 else:
                     kind = self.actuators[axis].kind(t)
                     in_position = kind == path.Kind.Tracking
-                if axis in axes_in_use:
-                    all_in_position &= in_position
+                if not in_position and axis in axes_in_use:
+                    all_in_position = False
                 self.set_event(self._in_position_names[axis], inPosition=in_position)
             self.evt_allAxesInPosition.set_put(inPosition=all_in_position)
 
@@ -653,17 +659,37 @@ class ATMCSCsc(salobj.BaseCsc):
             self._telemetry_task.cancel()
 
     def m3_port_rot(self, t):
-        """Return exit port and rotator axis."""
+        """Return exit port and rotator axis.
+
+        Parameters
+        ----------
+        t : `float`
+            Current time, TAI unix seconds.
+
+        Returns
+        -------
+        port_rot : `tuple`
+            Exit port and rotator axis, as a tuple:
+            * exit port: an M3ExitPort enum value
+            * rotator axis: the instrument rotator at this port,
+              as an Axis enum value, or None if the port has no rotator.
+        """
         if not self.m3_in_position(t):
             return (None, None)
         cmd_pos = self.actuators[Axis.M3].cmd.p0
         for exit_port, (ind, m3state, rot_axis) in self._port_info_dict.items():
-            if self.port_az[ind] == cmd_pos:
+            if self.m3_port_pos[ind] == cmd_pos:
                 return (exit_port, rot_axis)
         return (None, None)
 
     def m3_in_position(self, t):
-        """Return True if the M3 is in position at the specified time."""
+        """Is the M3 actuator in position?
+
+        Parameters
+        ----------
+        t : `float`
+            Current time, TAI unix seconds.
+        """
         m3actuator = self.actuators[Axis.M3]
         if m3actuator.kind(t) != path.Kind.Stopped:
             return False
