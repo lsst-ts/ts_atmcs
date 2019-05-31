@@ -670,6 +670,7 @@ class ATMCSCsc(salobj.BaseCsc):
         -------
         port_rot : `tuple`
             Exit port and rotator axis, as a tuple:
+
             * exit port: an M3ExitPort enum value
             * rotator axis: the instrument rotator at this port,
               as an Axis enum value, or None if the port has no rotator.
