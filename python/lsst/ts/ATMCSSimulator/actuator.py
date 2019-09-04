@@ -132,7 +132,7 @@ class Actuator:
 
     @property
     def curr(self):
-        """Current path."""
+        """Get or set the current path, a `path.Path`."""
         return self._curr
 
     @curr.setter

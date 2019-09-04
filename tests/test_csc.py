@@ -129,11 +129,15 @@ class CscTestCase(unittest.TestCase):
                         "errorCode", "logMessage", "settingVersions",
                     ):
                         continue
-                    await harness.next_evt(evt_name)
+                    with self.subTest(evt_name=evt_name):
+                        await harness.next_evt(evt_name)
 
+                timeout = STD_TIMEOUT
                 for tel_name in harness.csc.salinfo.telemetry_names:
-                    tel = getattr(harness.remote, f"tel_{tel_name}")
-                    await tel.next(flush=False, timeout=0.1)
+                    with self.subTest(tel_name=tel_name):
+                        tel = getattr(harness.remote, f"tel_{tel_name}")
+                        await tel.next(flush=False, timeout=timeout)
+                    timeout = 0.1
 
         asyncio.get_event_loop().run_until_complete(doit())
 
@@ -256,6 +260,7 @@ class CscTestCase(unittest.TestCase):
                 state = await harness.remote.evt_summaryState.next(flush=False, timeout=STD_TIMEOUT)
                 self.assertEqual(state.summaryState, salobj.State.STANDBY)
 
+                print("Starting test; check that brakes are engaged")
                 for evt_name in self.brake_names:
                     data = await harness.next_evt(evt_name)
                     self.assertTrue(data.engaged)
@@ -265,12 +270,14 @@ class CscTestCase(unittest.TestCase):
                     self.assertFalse(data.enable)
 
                 # send start; new state is DISABLED
+                print("Send start; brakes are still engaged")
                 await harness.remote.cmd_start.start()
                 self.assertEqual(harness.csc.summary_state, salobj.State.DISABLED)
                 state = await harness.remote.evt_summaryState.next(flush=False, timeout=STD_TIMEOUT)
                 self.assertEqual(state.summaryState, salobj.State.DISABLED)
 
                 # send enable; new state is ENABLED
+                print("Send enable; check that brakes are disengaged")
                 await harness.remote.cmd_enable.start()
                 self.assertEqual(harness.csc.summary_state, salobj.State.ENABLED)
                 state = await harness.remote.evt_summaryState.next(flush=False, timeout=STD_TIMEOUT)
