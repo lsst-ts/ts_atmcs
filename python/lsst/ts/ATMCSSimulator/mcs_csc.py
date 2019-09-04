@@ -84,14 +84,16 @@ class ATMCSCsc(salobj.BaseCsc):
     def __init__(self, initial_state=salobj.State.STANDBY, initial_simulation_mode=1):
         super().__init__(name="ATMCS", index=0, initial_state=initial_state,
                          initial_simulation_mode=initial_simulation_mode)
-        self.telemetry_interval = 0.1
-        """Interval between telemetry updates (sec)"""
-        self._telemetry_task = salobj.make_done_future()
-        """Task that runs while the telemetry loop sleeps."""
+        # interval between telemetry updates (sec)
+        self._telemetry_interval = 1
+        # number of event updates per telemetry update
+        self._events_per_telemetry = 10
+        # task that runs while the events_and_telemetry_loop runs
+        self._events_and_telemetry_task = salobj.make_done_future()
+        # task that runs while axes are slewing to a halt from stopTracking
         self._stop_tracking_task = salobj.make_done_future()
-        """Task that runs while axes are slewing due to stopTracking."""
+        # task that runs while axes are halting before being disabled
         self._disable_all_drives_task = salobj.make_done_future()
-        """Task that runs while axes are halting before being disabled."""
         self._port_info_dict = {
             M3ExitPort.NASMYTH1: (0, M3State.NASMYTH1, Axis.NA1),
             M3ExitPort.NASMYTH2: (1, M3State.NASMYTH2, Axis.NA2),
@@ -179,14 +181,10 @@ class ATMCSCsc(salobj.BaseCsc):
 
     async def close_tasks(self):
         await super().close_tasks()
-        if not self._disable_all_drives_task.done():
-            self._disable_all_drives_task.cancel()
-        if not self._stop_tracking_task.done():
-            self._stop_tracking_task.cancel()
-        if not self._telemetry_task.done():
-            self._telemetry_task.cancel()
-        if not self._kill_tracking_timer.done():
-            self._kill_tracking_timer.cancel()
+        self._disable_all_drives_task.cancel()
+        self._stop_tracking_task.cancel()
+        self._events_and_telemetry_task.cancel()
+        self._kill_tracking_timer.cancel()
 
     def configure(self,
                   max_tracking_interval=2.5,
@@ -338,10 +336,11 @@ class ATMCSCsc(salobj.BaseCsc):
                          "elevation", "elevationVelocity",
                          "nasmyth1RotatorAngle", "nasmyth1RotatorAngleVelocity",
                          "nasmyth2RotatorAngle", "nasmyth2RotatorAngleVelocity",
-                         "time", "trackId")
+                         "time", "trackId", "tracksys", "radesys")
         evt_kwargs = dict((field, getattr(data, field)) for field in target_fields)
         self.evt_target.set_put(**evt_kwargs, force_output=True)
-        self.tel_mountEncoders.set(trackId=data.trackId)
+        self.tel_mount_AzEl_Encoders.set(trackId=data.trackId)
+        self.tel_mount_Nasmyth_Encoders.set(trackId=data.trackId)
 
         self._set_tracking_timer(restart=True)
 
@@ -353,8 +352,7 @@ class ATMCSCsc(salobj.BaseCsc):
         restart : `bool`
             If True then start or restart the tracking timer, else stop it.
         """
-        if not self._kill_tracking_timer.done():
-            self._kill_tracking_timer.cancel()
+        self._kill_tracking_timer.cancel()
         if restart:
             self._kill_tracking_timer = asyncio.ensure_future(self.kill_tracking())
 
@@ -389,8 +387,7 @@ class ATMCSCsc(salobj.BaseCsc):
         self._tracking_enabled = False
         for axis in MainAxes:
             self.actuators[axis].stop()
-        if not self._stop_tracking_task.done():
-            self._stop_tracking_task.cancel()
+        self._stop_tracking_task.cancel()
         self._stop_tracking_task = asyncio.ensure_future(self._finish_stop_tracking())
         self.update_events()
 
@@ -419,8 +416,7 @@ class ATMCSCsc(salobj.BaseCsc):
             else:
                 already_stopped = False
                 actuator.stop()
-        if not self._disable_all_drives_task.done():
-            self._disable_all_drives_task.cancel()
+        self._disable_all_drives_task.cancel()
         if not already_stopped:
             self._disable_all_drives_task = asyncio.ensure_future(self._finish_disable_all_drives())
         self.update_events()
@@ -449,11 +445,92 @@ class ATMCSCsc(salobj.BaseCsc):
         asyncio.ensure_future(self._run_update_events())
 
     async def _run_update_events(self):
+        """Sleep then run update_events.
+
+        Used to call update_events shortly after the _disable_all_drives_task
+        _stop_tracking_task are done.
+        """
         await asyncio.sleep(0)
         self.update_events()
 
+    async def implement_simulation_mode(self, simulation_mode):
+        if simulation_mode != 1:
+            raise salobj.ExpectedError(
+                f"This CSC only supports simulation; simulation_mode={simulation_mode} but must be 1")
+
+    def m3_port_rot(self, t):
+        """Return exit port and rotator axis.
+
+        Parameters
+        ----------
+        t : `float`
+            Current time, TAI unix seconds.
+
+        Returns
+        -------
+        port_rot : `tuple`
+            Exit port and rotator axis, as a tuple:
+
+            * exit port: an M3ExitPort enum value
+            * rotator axis: the instrument rotator at this port,
+              as an Axis enum value, or None if the port has no rotator.
+        """
+        if not self.m3_in_position(t):
+            return (None, None)
+        cmd_pos = self.actuators[Axis.M3].cmd.p0
+        for exit_port, (ind, m3state, rot_axis) in self._port_info_dict.items():
+            if self.m3_port_pos[ind] == cmd_pos:
+                return (exit_port, rot_axis)
+        return (None, None)
+
+    def m3_in_position(self, t):
+        """Is the M3 actuator in position?
+
+        Parameters
+        ----------
+        t : `float`
+            Current time, TAI unix seconds.
+        """
+        m3actuator = self.actuators[Axis.M3]
+        if m3actuator.kind(t) != path.Kind.Stopped:
+            return False
+        m3cmd_pos = m3actuator.cmd.p0
+        m3curr_pos, m3curr_vel = m3actuator.curr[-1].pva(t)[0:2]
+        return abs(m3cmd_pos - m3curr_pos) < self.m3tolerance
+
+    def report_summary_state(self):
+        super().report_summary_state()
+        if self.summary_state == salobj.State.ENABLED:
+            axes_to_enable = set((Axis.Elevation, Axis.Azimuth))
+            t = curr_tai()
+            rot_axis = self.m3_port_rot(t)[1]
+            if rot_axis is not None:
+                axes_to_enable.add(rot_axis)
+            for axis in Axis:
+                self._axis_enabled[axis] = axis in axes_to_enable
+        else:
+            self.disable_all_drives()
+        if self.summary_state in (salobj.State.DISABLED, salobj.State.ENABLED):
+            if self._events_and_telemetry_task.done():
+                self._events_and_telemetry_task = asyncio.ensure_future(self.events_and_telemetry_loop())
+        else:
+            self._events_and_telemetry_task.cancel()
+
+    def set_event(self, evt_name, **kwargs):
+        """Call ``ControllerEvent.set_put`` for an event specified by name.
+
+        Parameters
+        ----------
+        evt_name : `str`
+            Event name (without the ``evt_`` prefix)
+        **kwargs : `dict`
+            Data for ``ControllerEvent.set``
+        """
+        evt = getattr(self, f"evt_{evt_name}")
+        evt.set_put(**kwargs)
+
     def update_events(self):
-        """Set state of the various events.
+        """Update most events and output those that have changed.
 
         Notes
         -----
@@ -622,83 +699,105 @@ class ATMCSCsc(salobj.BaseCsc):
         detent_values = dict((field_name, field_name == at_field) for field_name in detent_map.values())
         self.evt_m3RotatorDetentSwitches.set_put(**detent_values)
 
-    async def implement_simulation_mode(self, simulation_mode):
-        if simulation_mode != 1:
-            raise salobj.ExpectedError(
-                f"This CSC only supports simulation; simulation_mode={simulation_mode} but must be 1")
-
-    def set_event(self, evt_name, **kwargs):
-        """Call ``ControllerEvent.set_put`` for an event specified by name.
-
-        Parameters
-        ----------
-        evt_name : `str`
-            Event name (without the ``evt_`` prefix)
-        **kwargs : `dict`
-            Data for ``ControllerEvent.set``
+    def update_telemetry(self):
+        """Output all telemetry topics.
         """
-        evt = getattr(self, f"evt_{evt_name}")
-        evt.set_put(**kwargs)
+        nitems = len(self.tel_mount_AzEl_Encoders.data.elevationEncoder1Raw)
+        curr_time = curr_tai()
 
-    def report_summary_state(self):
-        super().report_summary_state()
-        if self.summary_state == salobj.State.ENABLED:
-            axes_to_enable = set((Axis.Elevation, Axis.Azimuth))
-            t = curr_tai()
-            rot_axis = self.m3_port_rot(t)[1]
-            if rot_axis is not None:
-                axes_to_enable.add(rot_axis)
-            for axis in Axis:
-                self._axis_enabled[axis] = axis in axes_to_enable
-        else:
-            self.disable_all_drives()
-        if self.summary_state in (salobj.State.DISABLED, salobj.State.ENABLED):
-            if self._telemetry_task.done():
-                self._telemetry_task = asyncio.ensure_future(self.telemetry_loop())
-        elif not self._telemetry_task.done():
-            self._telemetry_task.cancel()
+        times = np.linspace(start=curr_time - self._telemetry_interval,
+                            stop=curr_time,
+                            num=nitems, endpoint=True)
 
-    def m3_port_rot(self, t):
-        """Return exit port and rotator axis.
+        for i, t in enumerate(times):
+            pva_list = [actuator.curr.pva(t) for actuator in self.actuators]
+            curr_pos = np.array([pva[0] for pva in pva_list], dtype=float)
+            curr_vel = np.array([pva[1] for pva in pva_list], dtype=float)
+            curr_accel = np.array([pva[2] for pva in pva_list], dtype=float)
 
-        Parameters
-        ----------
-        t : `float`
-            Current time, TAI unix seconds.
+            axis_encoder_counts = (curr_pos*self.axis_encoder_counts_per_deg).astype(int)
+            torque = curr_accel*self.torque_per_accel
+            motor_pos = curr_pos * self.motor_axis_ratio
+            motor_pos = (motor_pos + 360) % 360 - 360
+            motor_encoder_counts = (motor_pos*self.motor_encoder_counts_per_deg).astype(int)
 
-        Returns
-        -------
-        port_rot : `tuple`
-            Exit port and rotator axis, as a tuple:
+            trajectory_data = self.tel_trajectory.data
+            trajectory_data.elevation[i] = curr_pos[Axis.Elevation]
+            trajectory_data.azimuth[i] = curr_pos[Axis.Azimuth]
+            trajectory_data.nasmyth1RotatorAngle[i] = curr_pos[Axis.NA1]
+            trajectory_data.nasmyth2RotatorAngle[i] = curr_pos[Axis.NA2]
+            trajectory_data.elevationVelocity[i] = curr_vel[Axis.Elevation]
+            trajectory_data.azimuthVelocity[i] = curr_vel[Axis.Azimuth]
+            trajectory_data.nasmyth1RotatorAngleVelocity[i] = curr_vel[Axis.NA1]
+            trajectory_data.nasmyth2RotatorAngleVelocity[i] = curr_vel[Axis.NA2]
 
-            * exit port: an M3ExitPort enum value
-            * rotator axis: the instrument rotator at this port,
-              as an Axis enum value, or None if the port has no rotator.
-        """
-        if not self.m3_in_position(t):
-            return (None, None)
-        cmd_pos = self.actuators[Axis.M3].cmd.p0
-        for exit_port, (ind, m3state, rot_axis) in self._port_info_dict.items():
-            if self.m3_port_pos[ind] == cmd_pos:
-                return (exit_port, rot_axis)
-        return (None, None)
+            azel_encoders_data = self.tel_mount_AzEl_Encoders.data
+            azel_encoders_data.elevationCalculatedAngle[i] = curr_pos[Axis.Elevation]
+            azel_encoders_data.elevationEncoder1Raw[i] = axis_encoder_counts[Axis.Elevation]
+            azel_encoders_data.elevationEncoder2Raw[i] = axis_encoder_counts[Axis.Elevation]
+            azel_encoders_data.elevationEncoder3Raw[i] = axis_encoder_counts[Axis.Elevation]
+            azel_encoders_data.azimuthCalculatedAngle[i] = curr_pos[Axis.Azimuth]
+            azel_encoders_data.azimuthEncoder1Raw[i] = axis_encoder_counts[Axis.Azimuth]
+            azel_encoders_data.azimuthEncoder2Raw[i] = axis_encoder_counts[Axis.Azimuth]
+            azel_encoders_data.azimuthEncoder3Raw[i] = axis_encoder_counts[Axis.Azimuth]
 
-    def m3_in_position(self, t):
-        """Is the M3 actuator in position?
+            nasmyth_encoders_data = self.tel_mount_Nasmyth_Encoders.data
+            nasmyth_encoders_data.nasmyth1CalculatedAngle[i] = curr_pos[Axis.NA1]
+            nasmyth_encoders_data.nasmyth1Encoder1Raw[i] = axis_encoder_counts[Axis.NA1]
+            nasmyth_encoders_data.nasmyth1Encoder2Raw[i] = axis_encoder_counts[Axis.NA1]
+            nasmyth_encoders_data.nasmyth1Encoder3Raw[i] = axis_encoder_counts[Axis.NA1]
+            nasmyth_encoders_data.nasmyth2CalculatedAngle[i] = curr_pos[Axis.NA2]
+            nasmyth_encoders_data.nasmyth2Encoder1Raw[i] = axis_encoder_counts[Axis.NA2]
+            nasmyth_encoders_data.nasmyth2Encoder2Raw[i] = axis_encoder_counts[Axis.NA2]
+            nasmyth_encoders_data.nasmyth2Encoder3Raw[i] = axis_encoder_counts[Axis.NA2]
 
-        Parameters
-        ----------
-        t : `float`
-            Current time, TAI unix seconds.
-        """
-        m3actuator = self.actuators[Axis.M3]
-        if m3actuator.kind(t) != path.Kind.Stopped:
-            return False
-        m3cmd_pos = m3actuator.cmd.p0
-        m3curr_pos, m3curr_vel = m3actuator.curr[-1].pva(t)[0:2]
-        return abs(m3cmd_pos - m3curr_pos) < self.m3tolerance
+            torqueDemand_data = self.tel_torqueDemand.data
+            torqueDemand_data.elevationMotorTorque[i] = torque[Axis.Elevation]
+            torqueDemand_data.azimuthMotor1Torque[i] = torque[Axis.Azimuth]
+            torqueDemand_data.azimuthMotor2Torque[i] = torque[Axis.Azimuth]
+            torqueDemand_data.nasmyth1MotorTorque[i] = torque[Axis.NA1]
+            torqueDemand_data.nasmyth2MotorTorque[i] = torque[Axis.NA2]
 
-    async def telemetry_loop(self):
+            measuredTorque_data = self.tel_measuredTorque.data
+            measuredTorque_data.elevationMotorTorque[i] = torque[Axis.Elevation]
+            measuredTorque_data.azimuthMotor1Torque[i] = torque[Axis.Azimuth]
+            measuredTorque_data.azimuthMotor2Torque[i] = torque[Axis.Azimuth]
+            measuredTorque_data.nasmyth1MotorTorque[i] = torque[Axis.NA1]
+            measuredTorque_data.nasmyth2MotorTorque[i] = torque[Axis.NA2]
+
+            measuredMotorVelocity_data = self.tel_measuredMotorVelocity.data
+            measuredMotorVelocity_data.elevationMotorVelocity[i] = curr_vel[Axis.Elevation]
+            measuredMotorVelocity_data.azimuthMotor1Velocity[i] = curr_vel[Axis.Azimuth]
+            measuredMotorVelocity_data.azimuthMotor2Velocity[i] = curr_vel[Axis.Azimuth]
+            measuredMotorVelocity_data.nasmyth1MotorVelocity[i] = curr_vel[Axis.NA1]
+            measuredMotorVelocity_data.nasmyth2MotorVelocity[i] = curr_vel[Axis.NA2]
+
+            azel_mountMotorEncoders_data = self.tel_azEl_mountMotorEncoders.data
+            azel_mountMotorEncoders_data.elevationEncoder[i] = motor_pos[Axis.Elevation]
+            azel_mountMotorEncoders_data.azimuth1Encoder[i] = motor_pos[Axis.Azimuth]
+            azel_mountMotorEncoders_data.azimuth2Encoder[i] = motor_pos[Axis.Azimuth]
+            azel_mountMotorEncoders_data.elevationEncoderRaw[i] = motor_encoder_counts[Axis.Elevation]
+            azel_mountMotorEncoders_data.azimuth1EncoderRaw[i] = motor_encoder_counts[Axis.Azimuth]
+            azel_mountMotorEncoders_data.azimuth2EncoderRaw[i] = motor_encoder_counts[Axis.Azimuth]
+
+            nasmyth_m3_mountMotorEncoders_data = self.tel_nasymth_m3_mountMotorEncoders.data
+            nasmyth_m3_mountMotorEncoders_data.nasmyth1Encoder[i] = motor_pos[Axis.NA1]
+            nasmyth_m3_mountMotorEncoders_data.nasmyth2Encoder[i] = motor_pos[Axis.NA2]
+            nasmyth_m3_mountMotorEncoders_data.m3Encoder[i] = motor_pos[Axis.M3]
+            nasmyth_m3_mountMotorEncoders_data.nasmyth1EncoderRaw[i] = motor_encoder_counts[Axis.NA1]
+            nasmyth_m3_mountMotorEncoders_data.nasmyth2EncoderRaw[i] = motor_encoder_counts[Axis.NA2]
+            nasmyth_m3_mountMotorEncoders_data.m3EncoderRaw[i] = motor_encoder_counts[Axis.M3]
+
+        self.tel_trajectory.set_put(cRIO_timestamp=times[0])
+        self.tel_mount_AzEl_Encoders.set_put(cRIO_timestamp=times[0])
+        self.tel_mount_Nasmyth_Encoders.set_put(cRIO_timestamp=times[0])
+        self.tel_torqueDemand.set_put(cRIO_timestamp=times[0])
+        self.tel_measuredTorque.set_put(cRIO_timestamp=times[0])
+        self.tel_measuredMotorVelocity.set_put(cRIO_timestamp=times[0])
+        self.tel_azEl_mountMotorEncoders.set_put(cRIO_timestamp=times[0])
+        self.tel_nasymth_m3_mountMotorEncoders.set_put(cRIO_timestamp=times[0])
+
+    async def events_and_telemetry_loop(self):
         """Output telemetry and events that have changed
 
         Notes
@@ -713,71 +812,14 @@ class ATMCSCsc(salobj.BaseCsc):
 
         See `update_events` for the events that are output.
         """
+        i = 0
         while self.summary_state in (salobj.State.DISABLED, salobj.State.ENABLED):
             # update events first so that limits are handled
+            i += 1
             self.update_events()
 
-            curr_time = curr_tai()
-            pva_list = [actuator.curr.pva(curr_time) for actuator in self.actuators]
-            curr_pos = np.array([pva[0] for pva in pva_list], dtype=float)
-            curr_vel = np.array([pva[1] for pva in pva_list], dtype=float)
-            curr_accel = np.array([pva[2] for pva in pva_list], dtype=float)
+            if i >= self._events_per_telemetry:
+                i = 0
+                self.update_telemetry()
 
-            axis_encoder_counts = (curr_pos*self.axis_encoder_counts_per_deg).astype(int)
-            torque = curr_accel*self.torque_per_accel
-            motor_pos = curr_pos * self.motor_axis_ratio
-            motor_pos = (motor_pos + 360) % 360 - 360
-            motor_encoder_counts = (motor_pos*self.motor_encoder_counts_per_deg).astype(int)
-
-            self.tel_mountEncoders.set_put(
-                elevationCalculatedAngle=curr_pos[Axis.Elevation],
-                azimuthCalculatedAngle=curr_pos[Axis.Azimuth],
-                nasmyth1CalculatedAngle=curr_pos[Axis.NA1],
-                nasmyth2CalculatedAngle=curr_pos[Axis.NA2],
-                elevationEncoder1Raw=axis_encoder_counts[Axis.Elevation],
-                elevationEncoder2Raw=axis_encoder_counts[Axis.Elevation],
-                elevationEncoder3Raw=axis_encoder_counts[Axis.Elevation],
-                azimuthEncoder1Raw=axis_encoder_counts[Axis.Azimuth],
-                azimuthEncoder2Raw=axis_encoder_counts[Axis.Azimuth],
-                azimuthEncoder3Raw=axis_encoder_counts[Axis.Azimuth],
-                nasmyth1Encoder1Raw=axis_encoder_counts[Axis.NA1],
-                nasmyth1Encoder2Raw=axis_encoder_counts[Axis.NA1],
-                nasmyth1Encoder3Raw=axis_encoder_counts[Axis.NA1],
-                nasmyth2Encoder1Raw=axis_encoder_counts[Axis.NA2],
-                nasmyth2Encoder2Raw=axis_encoder_counts[Axis.NA2],
-                nasmyth2Encoder3Raw=axis_encoder_counts[Axis.NA2],
-            )
-            self.tel_torqueDemand.set_put(
-                elevationMotorTorque=torque[Axis.Elevation],
-                azimuthMotor1Torque=torque[Axis.Azimuth],
-                azimuthMotor2Torque=torque[Axis.Azimuth],
-                nasmyth1MotorTorque=torque[Axis.NA1],
-                nasmyth2MotorTorque=torque[Axis.NA2],
-            )
-            self.tel_measuredTorque.set_put(
-                elevationMotorTorque=torque[Axis.Elevation],
-                azimuthMotor1Torque=torque[Axis.Azimuth],
-                azimuthMotor2Torque=torque[Axis.Azimuth],
-                nasmyth1MotorTorque=torque[Axis.NA1],
-                nasmyth2MotorTorque=torque[Axis.NA2],
-            )
-            self.tel_measuredMotorVelocity.set_put(
-                elevationMotorVelocity=curr_vel[Axis.Elevation],
-                azimuthMotor1Velocity=curr_vel[Axis.Azimuth],
-                azimuthMotor2Velocity=curr_vel[Axis.Azimuth],
-                nasmyth1MotorVelocity=curr_vel[Axis.NA1],
-                nasmyth2MotorVelocity=curr_vel[Axis.NA2],
-            )
-            self.tel_mountMotorEncoders.set_put(
-                elevationEncoder=motor_pos[Axis.Elevation],
-                azimuth1Encoder=motor_pos[Axis.Azimuth],
-                azimuth2Encoder=motor_pos[Axis.Azimuth],
-                nasmyth1Encoder=motor_pos[Axis.NA1],
-                nasmyth2Encoder=motor_pos[Axis.NA2],
-                elevationEncoderRaw=motor_encoder_counts[Axis.Elevation],
-                azimuth1EncoderRaw=motor_encoder_counts[Axis.Azimuth],
-                azimuth2EncoderRaw=motor_encoder_counts[Axis.Azimuth],
-                nasmyth1EncoderRaw=motor_encoder_counts[Axis.NA1],
-                nasmyth2EncoderRaw=motor_encoder_counts[Axis.NA2],
-            )
-            await asyncio.sleep(self.telemetry_interval)
+            await asyncio.sleep(self._telemetry_interval/self._events_per_telemetry)
