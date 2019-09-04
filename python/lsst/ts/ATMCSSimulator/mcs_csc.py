@@ -181,14 +181,10 @@ class ATMCSCsc(salobj.BaseCsc):
 
     async def close_tasks(self):
         await super().close_tasks()
-        if not self._disable_all_drives_task.done():
-            self._disable_all_drives_task.cancel()
-        if not self._stop_tracking_task.done():
-            self._stop_tracking_task.cancel()
-        if not self._events_and_telemetry_task.done():
-            self._events_and_telemetry_task.cancel()
-        if not self._kill_tracking_timer.done():
-            self._kill_tracking_timer.cancel()
+        self._disable_all_drives_task.cancel()
+        self._stop_tracking_task.cancel()
+        self._events_and_telemetry_task.cancel()
+        self._kill_tracking_timer.cancel()
 
     def configure(self,
                   max_tracking_interval=2.5,
@@ -356,8 +352,7 @@ class ATMCSCsc(salobj.BaseCsc):
         restart : `bool`
             If True then start or restart the tracking timer, else stop it.
         """
-        if not self._kill_tracking_timer.done():
-            self._kill_tracking_timer.cancel()
+        self._kill_tracking_timer.cancel()
         if restart:
             self._kill_tracking_timer = asyncio.ensure_future(self.kill_tracking())
 
@@ -392,8 +387,7 @@ class ATMCSCsc(salobj.BaseCsc):
         self._tracking_enabled = False
         for axis in MainAxes:
             self.actuators[axis].stop()
-        if not self._stop_tracking_task.done():
-            self._stop_tracking_task.cancel()
+        self._stop_tracking_task.cancel()
         self._stop_tracking_task = asyncio.ensure_future(self._finish_stop_tracking())
         self.update_events()
 
@@ -422,8 +416,7 @@ class ATMCSCsc(salobj.BaseCsc):
             else:
                 already_stopped = False
                 actuator.stop()
-        if not self._disable_all_drives_task.done():
-            self._disable_all_drives_task.cancel()
+        self._disable_all_drives_task.cancel()
         if not already_stopped:
             self._disable_all_drives_task = asyncio.ensure_future(self._finish_disable_all_drives())
         self.update_events()
@@ -520,7 +513,7 @@ class ATMCSCsc(salobj.BaseCsc):
         if self.summary_state in (salobj.State.DISABLED, salobj.State.ENABLED):
             if self._events_and_telemetry_task.done():
                 self._events_and_telemetry_task = asyncio.ensure_future(self.events_and_telemetry_loop())
-        elif not self._events_and_telemetry_task.done():
+        else:
             self._events_and_telemetry_task.cancel()
 
     def set_event(self, evt_name, **kwargs):
