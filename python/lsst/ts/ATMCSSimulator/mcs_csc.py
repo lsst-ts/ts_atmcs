@@ -284,9 +284,9 @@ class ATMCSCsc(salobj.BaseCsc):
         self.motor_axis_ratio = motor_axis_ratio
         self.torque_per_accel = torque_per_accel
         self.nsettle = nsettle
+        # allowed position error for M3 to be considered in position (deg)
         self.m3tolerance = 1e-5
         self.limit_overtravel = limit_overtravel
-        """Allowed position error for M3 to be considered in position (deg)"""
 
         t = curr_tai()
         self.actuators = [Actuator(
@@ -296,6 +296,8 @@ class ATMCSCsc(salobj.BaseCsc):
             nsettle=self.nsettle, t=t,
         ) for axis in Axis]
         self.actuators[0].verbose = True
+
+        self.evt_positionLimits.set_put(minimum=pmin_cmd, maximum=pmax_cmd, force_output=True)
 
     def do_startTracking(self, data):
         self.assert_enabled("startTracking")
