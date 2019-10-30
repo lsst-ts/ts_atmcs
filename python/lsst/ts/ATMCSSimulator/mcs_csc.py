@@ -292,7 +292,9 @@ class ATMCSCsc(salobj.BaseCsc):
         self.actuators = [Actuator(
             pmin=self.pmin_cmd[axis], pmax=self.pmax_cmd[axis],
             vmax=vmax[axis], amax=amax[axis],
-            dtmax_track=self.max_tracking_interval,
+            # Use 0 for M3 to prevent tracking.
+            # TODO DM-21957: replace M3 actuator with a point to point actuator
+            dtmax_track=0 if axis == 4 else self.max_tracking_interval,
             nsettle=self.nsettle, t=t,
         ) for axis in Axis]
         self.actuators[0].verbose = True

@@ -125,6 +125,7 @@ class CscTestCase(unittest.TestCase):
                         "m3PortSelected",  # output by setInstrumentPort
                         "target",  # output by trackTarget
                         "summaryState",  # already read
+                        "softwareVersions",  # not yet supported by salobj
                         "appliedSettingsMatchStart", "detailedState",
                         "errorCode", "logMessage", "settingVersions",
                     ):
