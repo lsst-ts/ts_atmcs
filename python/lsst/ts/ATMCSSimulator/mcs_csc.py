@@ -329,8 +329,7 @@ class ATMCSCsc(salobj.BaseCsc):
                 raise salobj.ExpectedError(f"Magnitude of one or more target velocities "
                                            f"{vel} > {self.vmax}")
         except Exception as e:
-            self.evt_errorCode.set_put(errorCode=1, errorReport=f"trackTarget failed: {e}", force_output=True)
-            self.fault()
+            self.fault(code=1, report=f"trackTarget failed: {e}")
             raise
 
         for i in range(4):
@@ -402,10 +401,7 @@ class ATMCSCsc(salobj.BaseCsc):
         if the next ``trackTarget`` command is not seen quickly enough.
         """
         await asyncio.sleep(self.max_tracking_interval)
-        self.evt_errorCode.set_put(errorCode=2,
-                                   errorReport=f"trackTarget not seen in {self.max_tracking_interval} sec",
-                                   force_output=True)
-        self.fault()
+        self.fault(code=2, report=f"trackTarget not seen in {self.max_tracking_interval} sec")
 
     def disable_all_drives(self):
         """Stop all drives, disable them and put on brakes.
