@@ -66,8 +66,8 @@ class TPVAJ:
         dt = t - self.t0
         return (
             self.p0 + dt*(self.v0 + dt*(0.5*self.a0 + dt*self.j/6)),
-            self.v0 + dt*self.a0,
-            self.a0,
+            self.v0 + dt*(self.a0 + dt*(0.5*self.j)),
+            self.a0 + dt*self.j,
         )
 
     def __repr__(self):
