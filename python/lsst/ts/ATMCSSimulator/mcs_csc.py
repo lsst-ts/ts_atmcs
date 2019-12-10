@@ -51,9 +51,6 @@ class ATMCSCsc(salobj.BaseCsc):
     initial_state : `salobj.State` or `int` (optional)
         The initial state of the CSC. This is provided for unit testing,
         as real CSCs should start up in `State.STANDBY`, the default.
-    initial_simulation_mode : `int` (optional)
-        Initial simulation mode.
-        The only allowed value is 1: simulating.
 
     Notes
     -----
@@ -81,9 +78,9 @@ class ATMCSCsc(salobj.BaseCsc):
       * The CW switch is  active if az > az2
       * Otherwise neither switch is active
     """
-    def __init__(self, initial_state=salobj.State.STANDBY, initial_simulation_mode=1):
+    def __init__(self, initial_state=salobj.State.STANDBY):
         super().__init__(name="ATMCS", index=0, initial_state=initial_state,
-                         initial_simulation_mode=initial_simulation_mode)
+                         simulation_mode=1)
         # interval between telemetry updates (sec)
         self._telemetry_interval = 1
         # number of event updates per telemetry update
