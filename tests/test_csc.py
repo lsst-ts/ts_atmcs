@@ -22,6 +22,7 @@ import asyncio
 import unittest
 
 from lsst.ts import salobj
+from lsst.ts import simactuators
 from lsst.ts import ATMCSSimulator
 from lsst.ts.idl.enums.ATMCS import AtMountState, M3ExitPort, M3State
 
@@ -148,12 +149,12 @@ class CscTestCase(unittest.TestCase):
             async with Harness(initial_state=salobj.State.ENABLED) as harness:
                 pmin_cmd = (5, -270, -165, -165, 0)
                 pmax_cmd = (90, 270, 165, 165, 180)
-                vmax = (100,)*5
+                max_velocity = (100,)*5
                 harness.csc.configure(
                     pmin_cmd=pmin_cmd,
                     pmax_cmd=pmax_cmd,
-                    vmax=vmax,
-                    amax=(200,)*5,
+                    max_velocity=max_velocity,
+                    max_acceleration=(200,)*5,
                 )
                 good_target_kwargs = dict((name, 0) for name in self.axis_names)
                 # elevation does not have 0 in its valid range
@@ -170,7 +171,7 @@ class CscTestCase(unittest.TestCase):
 
                 # cannot send trackTarget while tracking disabled;
                 # this error does not change the summary state
-                harness.remote.cmd_trackTarget.set(time=ATMCSSimulator.curr_tai(), **good_target_kwargs)
+                harness.remote.cmd_trackTarget.set(time=salobj.current_tai(), **good_target_kwargs)
                 with salobj.assertRaisesAckError():
                     await harness.remote.cmd_trackTarget.start(timeout=1)
 
@@ -202,7 +203,7 @@ class CscTestCase(unittest.TestCase):
 
                         pmin_kwargs = good_target_kwargs.copy()
                         pmin_kwargs[self.axis_names[axis]] = pmin_cmd[axis] - 0.000001
-                        harness.remote.cmd_trackTarget.set(time=ATMCSSimulator.curr_tai(), **pmin_kwargs)
+                        harness.remote.cmd_trackTarget.set(time=salobj.current_tai(), **pmin_kwargs)
                         with salobj.assertRaisesAckError():
                             await harness.remote.cmd_trackTarget.start(timeout=1)
                         data = await harness.next_evt("atMountState", timeout=STD_TIMEOUT)
@@ -215,7 +216,7 @@ class CscTestCase(unittest.TestCase):
 
                         pmax_kwargs = good_target_kwargs.copy()
                         pmax_kwargs[self.axis_names[axis]] = pmax_cmd[axis] + 0.000001
-                        harness.remote.cmd_trackTarget.set(time=ATMCSSimulator.curr_tai(), **pmax_kwargs)
+                        harness.remote.cmd_trackTarget.set(time=salobj.current_tai(), **pmax_kwargs)
                         with salobj.assertRaisesAckError():
                             await harness.remote.cmd_trackTarget.start(timeout=1)
                         data = await harness.next_evt("atMountState")
@@ -227,8 +228,8 @@ class CscTestCase(unittest.TestCase):
                         self.assertEqual(data.state, AtMountState.TRACKINGENABLED)
 
                         vmax_kwargs = good_target_kwargs.copy()
-                        vmax_kwargs[f"{self.axis_names[axis]}Velocity"] = vmax[axis] + 0.000001
-                        harness.remote.cmd_trackTarget.set(time=ATMCSSimulator.curr_tai(), **vmax_kwargs)
+                        vmax_kwargs[f"{self.axis_names[axis]}Velocity"] = max_velocity[axis] + 0.000001
+                        harness.remote.cmd_trackTarget.set(time=salobj.current_tai(), **vmax_kwargs)
                         with salobj.assertRaisesAckError():
                             await harness.remote.cmd_trackTarget.start(timeout=1)
                         data = await harness.next_evt("atMountState", timeout=STD_TIMEOUT)
@@ -244,7 +245,7 @@ class CscTestCase(unittest.TestCase):
                 way_out_kwargs = good_target_kwargs.copy()
                 way_out_kwargs["elevation"] = 85
                 way_out_kwargs["elevationVelocity"] = -2
-                harness.remote.cmd_trackTarget.set(time=ATMCSSimulator.curr_tai() + 10, **way_out_kwargs)
+                harness.remote.cmd_trackTarget.set(time=salobj.current_tai() + 10, **way_out_kwargs)
                 with salobj.assertRaisesAckError():
                     await harness.remote.cmd_trackTarget.start(timeout=1)
                 data = await harness.next_evt("atMountState")
@@ -336,8 +337,8 @@ class CscTestCase(unittest.TestCase):
         async def doit():
             async with Harness(initial_state=salobj.State.ENABLED) as harness:
                 harness.csc.configure(
-                    vmax=(100,)*5,
-                    amax=(200,)*5,
+                    max_velocity=(100,)*5,
+                    max_acceleration=(200,)*5,
                 )
                 state = await harness.remote.evt_summaryState.next(flush=False, timeout=5)
                 self.assertEqual(state.summaryState, salobj.State.ENABLED)
@@ -359,7 +360,7 @@ class CscTestCase(unittest.TestCase):
                 data = harness.remote.evt_nasmyth2DriveStatus.get(flush=True)
                 self.assertFalse(data.enable)
 
-                t0 = ATMCSSimulator.curr_tai()
+                start_tai = salobj.current_tai()
 
                 await asyncio.sleep(0.2)
 
@@ -368,12 +369,13 @@ class CscTestCase(unittest.TestCase):
                     await harness.remote.cmd_startTracking.start()
 
                 actuator = harness.csc.actuators[ATMCSSimulator.Axis.M3]
-                curr_pos, curr_vel = actuator.curr.pva(ATMCSSimulator.curr_tai())[0:2]
-                self.assertNotEqual(curr_vel, 0)
+                curr_segment = actuator.path.at(salobj.current_tai())
+                self.assertNotEqual(curr_segment.velocity, 0)
 
                 # M3 is pointing to Port 3; neither rotator should be enabled
                 data = await harness.next_evt("m3State", timeout=5)
-                print(f"test_set_instrument_port M3 rotation took {ATMCSSimulator.curr_tai() - t0:0.2f} sec")
+                dt = salobj.current_tai() - start_tai
+                print(f"test_set_instrument_port M3 rotation took {dt:0.2f} sec")
                 self.assertEqual(data.state, M3State.PORT3)
                 data = harness.remote.evt_nasmyth1DriveStatus.get(flush=True)
                 self.assertFalse(data.enable)
@@ -383,7 +385,7 @@ class CscTestCase(unittest.TestCase):
                 await harness.remote.cmd_setInstrumentPort.set_start(port=M3ExitPort.NASMYTH2,
                                                                      timeout=STD_TIMEOUT)
 
-                t0 = ATMCSSimulator.curr_tai()
+                start_tai = salobj.current_tai()
                 data = await harness.next_evt("m3State", timeout=2)
                 self.assertEqual(data.state, M3State.INMOTION)
 
@@ -394,7 +396,8 @@ class CscTestCase(unittest.TestCase):
                 self.assertFalse(data.enable)
 
                 data = await harness.next_evt("m3State", timeout=5)
-                print(f"test_set_instrument_port M3 rotation took {ATMCSSimulator.curr_tai() - t0:0.2f} sec")
+                dt = salobj.current_tai() - start_tai
+                print(f"test_set_instrument_port M3 rotation took {dt:0.2f} sec")
                 self.assertEqual(data.state, M3State.NASMYTH2)
 
                 # M3 is pointing to Nasmyth2; that rotator
@@ -410,8 +413,8 @@ class CscTestCase(unittest.TestCase):
         async def doit():
             async with Harness(initial_state=salobj.State.ENABLED) as harness:
                 harness.csc.configure(
-                    vmax=(100,)*5,
-                    amax=(200,)*5,
+                    max_velocity=(100,)*5,
+                    max_acceleration=(200,)*5,
                 )
                 state = await harness.remote.evt_summaryState.next(flush=False, timeout=5)
                 self.assertEqual(state.summaryState, salobj.State.ENABLED)
@@ -442,21 +445,23 @@ class CscTestCase(unittest.TestCase):
                     harness.remote.cmd_setInstrumentPort.set(port=1)
                     await harness.remote.cmd_setInstrumentPort.start()
 
-                t0 = ATMCSSimulator.curr_tai()
+                start_tai = salobj.current_tai()
                 paths = dict(
-                    elevation=ATMCSSimulator.path.TPVAJ(t0=t0, p0=6, v0=0.001),
-                    azimuth=ATMCSSimulator.path.TPVAJ(t0=t0, p0=5, v0=-0.001),
-                    nasmyth1RotatorAngle=ATMCSSimulator.path.TPVAJ(t0=t0, p0=1, v0=-0.001),
+                    elevation=simactuators.path.PathSegment(tai=start_tai, position=6, velocity=0.001),
+                    azimuth=simactuators.path.PathSegment(tai=start_tai, position=5, velocity=-0.001),
+                    nasmyth1RotatorAngle=simactuators.path.PathSegment(tai=start_tai,
+                                                                       position=1,
+                                                                       velocity=-0.001),
                 )
                 trackId = 20  # arbitary
                 while True:
-                    t = ATMCSSimulator.curr_tai() + 0.1  # offset is arbitrary but reasonable
-                    harness.remote.cmd_trackTarget.set(time=t, trackId=trackId)
+                    tai = salobj.current_tai() + 0.1  # offset is arbitrary but reasonable
+                    harness.remote.cmd_trackTarget.set(time=tai, trackId=trackId)
                     for axis_name, path in paths.items():
-                        pos, vel = path.pva(t)[0:2]
+                        segment = path.at(tai)
                         kwargs = {
-                            axis_name: pos,
-                            f"{axis_name}Velocity": vel,
+                            axis_name: segment.position,
+                            f"{axis_name}Velocity": segment.velocity,
                         }
                         harness.remote.cmd_trackTarget.set(**kwargs)
                     await harness.remote.cmd_trackTarget.start(timeout=1)
@@ -468,12 +473,12 @@ class CscTestCase(unittest.TestCase):
                     if data.inPosition:
                         break
 
-                    if ATMCSSimulator.curr_tai() - t0 > 5:
+                    if salobj.current_tai() - start_tai > 5:
                         raise self.fail("Timed out waiting for slew to finish")
 
                     await asyncio.sleep(0.5)
 
-                print(f"test_track slew took {ATMCSSimulator.curr_tai() - t0:0.2f} sec")
+                print(f"test_track slew took {salobj.current_tai() - start_tai:0.2f} sec")
 
                 with self.assertRaises(asyncio.TimeoutError):
                     await harness.remote.evt_target.next(flush=False, timeout=0.1)
@@ -497,8 +502,8 @@ class CscTestCase(unittest.TestCase):
             async with Harness(initial_state=salobj.State.ENABLED) as harness:
                 harness.csc.configure(
                     max_tracking_interval=max_tracking_interval,
-                    vmax=(100,)*5,
-                    amax=(200,)*5,
+                    max_velocity=(100,)*5,
+                    max_acceleration=(200,)*5,
                 )
                 state = await harness.remote.evt_summaryState.next(flush=False, timeout=5)
                 self.assertEqual(state.summaryState, salobj.State.ENABLED)
@@ -526,7 +531,7 @@ class CscTestCase(unittest.TestCase):
 
                 harness.remote.cmd_trackTarget.set(
                     elevation=10,
-                    time=ATMCSSimulator.curr_tai(),
+                    time=salobj.current_tai(),
                     trackId=20,  # arbitary
                 )
                 await harness.remote.cmd_trackTarget.start(timeout=1)
@@ -557,21 +562,21 @@ class CscTestCase(unittest.TestCase):
                 data = await harness.next_evt("atMountState")
                 self.assertEqual(data.state, AtMountState.TRACKINGENABLED)
 
-                t0 = ATMCSSimulator.curr_tai()
+                start_tai = salobj.current_tai()
                 paths = dict(
-                    elevation=ATMCSSimulator.path.TPVAJ(t0=t0, p0=45),
-                    azimuth=ATMCSSimulator.path.TPVAJ(t0=t0, p0=100),
-                    nasmyth1RotatorAngle=ATMCSSimulator.path.TPVAJ(t0=t0, p0=90),
+                    elevation=simactuators.path.PathSegment(tai=start_tai, position=45),
+                    azimuth=simactuators.path.PathSegment(tai=start_tai, position=100),
+                    nasmyth1RotatorAngle=simactuators.path.PathSegment(tai=start_tai, position=90),
                 )
                 trackId = 35  # arbitary
 
-                t = t0 + 0.1  # offset is arbitrary but reasonable
-                harness.remote.cmd_trackTarget.set(time=t, trackId=trackId)
+                tai = start_tai + 0.1  # offset is arbitrary but reasonable
+                harness.remote.cmd_trackTarget.set(time=tai, trackId=trackId)
                 for axis_name, path in paths.items():
-                    pos, vel = path.pva(t)[0:2]
+                    segment = path.at(tai)
                     kwargs = {
-                        axis_name: pos,
-                        f"{axis_name}Velocity": vel,
+                        axis_name: segment.position,
+                        f"{axis_name}Velocity": segment.velocity,
                     }
                     harness.remote.cmd_trackTarget.set(**kwargs)
                 await harness.remote.cmd_trackTarget.start(timeout=1)
@@ -595,7 +600,7 @@ class CscTestCase(unittest.TestCase):
                 self.assertEqual(data.state, AtMountState.TRACKINGDISABLED)
 
                 for actuator in harness.csc.actuators:
-                    self.assertEqual(actuator.kind(), ATMCSSimulator.path.Kind.Stopped)
+                    self.assertEqual(actuator.kind(), actuator.Kind.Stopped)
 
         asyncio.get_event_loop().run_until_complete(doit())
 
@@ -613,21 +618,21 @@ class CscTestCase(unittest.TestCase):
                 data = await harness.next_evt("atMountState", timeout=STD_TIMEOUT)
                 self.assertEqual(data.state, AtMountState.TRACKINGENABLED)
 
-                t0 = ATMCSSimulator.curr_tai()
+                start_tai = salobj.current_tai()
                 paths = dict(
-                    elevation=ATMCSSimulator.path.TPVAJ(t0=t0, p0=45),
-                    azimuth=ATMCSSimulator.path.TPVAJ(t0=t0, p0=100),
-                    nasmyth1RotatorAngle=ATMCSSimulator.path.TPVAJ(t0=t0, p0=90),
+                    elevation=simactuators.path.PathSegment(tai=start_tai, position=45),
+                    azimuth=simactuators.path.PathSegment(tai=start_tai, position=100),
+                    nasmyth1RotatorAngle=simactuators.path.PathSegment(tai=start_tai, position=90),
                 )
                 trackId = 35  # arbitary
 
-                t = t0 + 0.1  # offset is arbitrary but reasonable
-                harness.remote.cmd_trackTarget.set(time=t, trackId=trackId)
+                tai = start_tai + 0.1  # offset is arbitrary but reasonable
+                harness.remote.cmd_trackTarget.set(time=tai, trackId=trackId)
                 for axis_name, path in paths.items():
-                    pos, vel = path.pva(t)[0:2]
+                    segment = path.at(tai)
                     kwargs = {
-                        axis_name: pos,
-                        f"{axis_name}Velocity": vel,
+                        axis_name: segment.position,
+                        f"{axis_name}Velocity": segment.velocity,
                     }
                     harness.remote.cmd_trackTarget.set(**kwargs)
                 await harness.remote.cmd_trackTarget.start(timeout=1)
