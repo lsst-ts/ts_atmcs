@@ -157,7 +157,7 @@ class ATMCSCsc(salobj.BaseCsc):
         self._kill_tracking_timer = salobj.make_done_future()
 
         self.configure()
-        # note: initial events are output by report_summary_state
+        # note: initial events are output by handle_summary_state
 
     async def close_tasks(self):
         await super().close_tasks()
@@ -486,7 +486,6 @@ class ATMCSCsc(salobj.BaseCsc):
         return abs(m3cmd_pos - m3curr.position) < self.m3tolerance
 
     async def handle_summary_state(self):
-        super().report_summary_state()
         if self.summary_state == salobj.State.ENABLED:
             axes_to_enable = set((Axis.Elevation, Axis.Azimuth))
             tai = salobj.current_tai()
