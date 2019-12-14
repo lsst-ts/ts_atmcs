@@ -90,18 +90,17 @@ class ATMCSCsc(salobj.BaseCsc):
         self._stop_tracking_task = salobj.make_done_future()
         # task that runs while axes are halting before being disabled
         self._disable_all_drives_task = salobj.make_done_future()
+        # Dict of M3ExitPort (the instrument port M3 points to): tuple of:
+        # * index of self.m3_port_pos: the M3 position for this port
+        # * M3State (state of M3 axis when pointing to this port)
+        # * Rotator axis at this port, as an Axis enum,
+        #   or None if this port has no rotator.
         self._port_info_dict = {
             M3ExitPort.NASMYTH1: (0, M3State.NASMYTH1, Axis.NA1),
             M3ExitPort.NASMYTH2: (1, M3State.NASMYTH2, Axis.NA2),
             M3ExitPort.PORT3: (2, M3State.PORT3, None),
         }
-        """Dict of M3ExitPort (the instrument port M3 points to): tuple of:
-        * index of self.m3_port_pos: the M3 position for this port
-        * M3State (state of M3 axis when pointing to this port)
-        * Rotator axis at this port, as an Axis enum,
-          or None if this port has no rotator.
-        """
-
+        # Name of minimum limit switch event for each axis.
         self._min_lim_names = (
             "elevationLimitSwitchLower",
             "azimuthLimitSwitchCW",
@@ -109,8 +108,7 @@ class ATMCSCsc(salobj.BaseCsc):
             "nasmyth2LimitSwitchCW",
             "m3RotatorLimitSwitchCW",
         )
-        """Name of minimum limit switch event for each axis."""
-
+        # Name of maximum limit switch event for each axis.
         self._max_lim_names = (
             "elevationLimitSwitchUpper",
             "azimuthLimitSwitchCCW",
@@ -118,8 +116,8 @@ class ATMCSCsc(salobj.BaseCsc):
             "nasmyth2LimitSwitchCCW",
             "m3RotatorLimitSwitchCCW",
         )
-        """Name of maximum limit switch event for each axis."""
-
+        # Name of "in position" event for each axis,
+        # excluding ``allAxesInPosition``.
         self._in_position_names = (
             "elevationInPosition",
             "azimuthInPosition",
@@ -127,10 +125,7 @@ class ATMCSCsc(salobj.BaseCsc):
             "nasmyth2RotatorInPosition",
             "m3InPosition",
         )
-        """Name of "in position" event for each axis;
-        excludes ``allAxesInPosition``.
-        """
-
+        # Name of drive status events for each axis.
         self._drive_status_names = (
             ("elevationDriveStatus",),
             ("azimuthDrive1Status", "azimuthDrive2Status",),
@@ -138,8 +133,7 @@ class ATMCSCsc(salobj.BaseCsc):
             ("nasmyth2DriveStatus",),
             ("m3DriveStatus",),
         )
-        """Name of drive status events for each axis."""
-
+        # Name of brake events for each axis.
         self._brake_names = (
             ("elevationBrake",),
             ("azimuthBrake1", "azimuthBrake2",),
@@ -147,30 +141,20 @@ class ATMCSCsc(salobj.BaseCsc):
             ("nasmyth2Brake",),
             (),
         )
-        """Name of brake events for each axis."""
-
+        # Has tracking been enabled by startTracking?
+        # This remains true until stopTracking is called or the
+        # summary state is no longer salobj.State.Enabled,
+        # even if some drives have been disabled by running into limits.
         self._tracking_enabled = False
-        """Has tracking been enabled by startTracking?
-
-        This remains true until stopTracking is called or the
-        summary state is no longer salobj.State.Enabled,
-        even if some drives have been disabled by running into limits.
-        """
-
+        # Is this particular axis enabled?
+        # This remains true until stopTracking is called or the
+        # summary state is no longer salobj.State.Enabled,
+        # or the axis runs into a limit.
+        # Note that the brakes automatically come on/off
+        # if the axis is disabled/enabled, respectively.
         self._axis_enabled = np.zeros([5], dtype=bool)
-        """Is this particular axis enabled?
-
-        This remains true until stopTracking is called or the
-        summary state is no longer salobj.State.Enabled,
-        or the axis runs into a limit.
-
-        Note that the brakes automatically come on/off
-        if the axis is disabled/enabled, respectively.
-        """
-
+        # Timer to kill tracking if trackTarget doesn't arrive in time.
         self._kill_tracking_timer = salobj.make_done_future()
-        """Timer to kill tracking if trackTarget doesn't arrive in time.
-        """
 
         self.configure()
         # note: initial events are output by report_summary_state
@@ -501,7 +485,7 @@ class ATMCSCsc(salobj.BaseCsc):
         m3curr = m3actuator.path[-1].at(tai)
         return abs(m3cmd_pos - m3curr.position) < self.m3tolerance
 
-    def report_summary_state(self):
+    async def handle_summary_state(self):
         super().report_summary_state()
         if self.summary_state == salobj.State.ENABLED:
             axes_to_enable = set((Axis.Elevation, Axis.Azimuth))
