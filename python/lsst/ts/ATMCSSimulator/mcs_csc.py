@@ -91,7 +91,7 @@ class ATMCSCsc(salobj.BaseCsc):
         # task that runs while axes are halting before being disabled
         self._disable_all_drives_task = salobj.make_done_future()
         # Dict of M3ExitPort (the instrument port M3 points to): tuple of:
-        # * index of self.m3_port_pos: the M3 position for this port
+        # * index of self.m3_port_positions: the M3 position for this port
         # * M3State (state of M3 axis when pointing to this port)
         # * Rotator axis at this port, as an Axis enum,
         #   or None if this port has no rotator.
@@ -168,14 +168,14 @@ class ATMCSCsc(salobj.BaseCsc):
 
     def configure(self,
                   max_tracking_interval=2.5,
-                  pmin_cmd=(5, -270, -165, -165, 0),
-                  pmax_cmd=(90, 270, 165, 165, 180),
-                  pmin_lim=(3, -272, -167, -167, -2),
-                  pmax_lim=(92, 272, 167, 167, 182),
+                  min_commanded_position=(5, -270, -165, -165, 0),
+                  max_commanded_position=(90, 270, 165, 165, 180),
+                  min_limit_switch_position=(3, -272, -167, -167, -2),
+                  max_limit_switch_position=(92, 272, 167, 167, 182),
                   max_velocity=(5, 5, 5, 5, 5),
                   max_acceleration=(3, 3, 3, 3, 3),
-                  topple_az=(2, 5),
-                  m3_port_pos=(0, 180, 90),
+                  topple_azimuth=(2, 5),
+                  m3_port_positions=(0, 180, 90),
                   needed_in_pos=3,
                   axis_encoder_counts_per_deg=(3.6e6, 3.6e6, 3.6e6, 3.6e6, 3.6e6),
                   motor_encoder_counts_per_deg=(3.6e5, 3.6e5, 3.6e5, 3.6e5, 3.6e5),
@@ -190,27 +190,27 @@ class ATMCSCsc(salobj.BaseCsc):
         ----------
         max_tracking_interval : `float`
             Maximum time between tracking updates (sec)
-        pmin_cmd : ``iterable`` of 5 `float`
-            Minimum commanded position for each axis_, in deg
-        pmax_cmd : ``iterable`` of 5 `float`
-            Minimum commanded position for each axis_, in deg
-        pmin_lim : ``iterable`` of 5 `float`
-            Position of minimum limit switch for each axis_, in deg
-        pmax_lim : ``iterable`` of 5 `float`
-            Position of maximum limit switch for each axis_, in deg
+        min_commanded_position : ``iterable`` of 5 `float`
+            Minimum commanded position for each axis, in deg
+        max_commanded_position : ``iterable`` of 5 `float`
+            Minimum commanded position for each axis, in deg
+        min_limit_switch_position : ``iterable`` of 5 `float`
+            Position of minimum L1 limit switch for each axis, in deg
+        max_limit_switch_position : ``iterable`` of 5 `float`
+            Position of maximum L1 limit switch for each axis, in deg
         max_velocity : ``iterable`` of 5 `float`
             Maximum velocity of each axis, in deg/sec
         max_acceleration : ``iterable`` of 5 `float`
             Maximum acceleration of each axis, in deg/sec
-        topple_az : ``iterable`` of 2 `float`
+        topple_azimuth : ``iterable`` of 2 `float`
             Min, max azimuth at which the topple block moves, in deg
-        m3_port_pos : ``iterable`` of 3 `float`
+        m3_port_positions : ``iterable`` of 3 `float`
             M3 position of instrument ports NA1, NA2 and Port3,
             in that order.
         axis_encoder_counts_per_deg : `list` [`float`]
-            Axis encoder resolution, for each axis_, in counts/deg
+            Axis encoder resolution, for each axis, in counts/deg
         motor_encoder_counts_per_deg : `list` [`float`]
-            Motor encoder resolution, for each axis_, in counts/deg
+            Motor encoder resolution, for each axis, in counts/deg
         motor_axis_ratio : `list` [`float`]
             Number of turns of the motor for one turn of the axis.
         torque_per_accel :  `list` [`float`]
@@ -230,18 +230,18 @@ class ATMCSCsc(salobj.BaseCsc):
 
         # convert and check all values first,
         # so nothing changes if any input is invalid
-        pmin_cmd = convert_values("pmin_cmd", pmin_cmd, 5)
-        pmax_cmd = convert_values("pmax_cmd", pmax_cmd, 5)
-        pmin_lim = convert_values("pmin_lim", pmin_lim, 5)
-        pmax_lim = convert_values("pmax_lim", pmax_lim, 5)
+        min_commanded_position = convert_values("min_commanded_position", min_commanded_position, 5)
+        max_commanded_position = convert_values("max_commanded_position", max_commanded_position, 5)
+        min_limit_switch_position = convert_values("min_limit_switch_position", min_limit_switch_position, 5)
+        max_limit_switch_position = convert_values("max_limit_switch_position", max_limit_switch_position, 5)
         max_velocity = convert_values("max_velocity", max_velocity, 5)
         max_acceleration = convert_values("max_acceleration", max_acceleration, 5)
         if max_velocity.min() <= 0:
             raise salobj.ExpectedError(f"max_velocity={max_velocity}; all values must be positive")
         if max_acceleration.min() <= 0:
             raise salobj.ExpectedError(f"max_acceleration={max_acceleration}; all values must be positive")
-        topple_az = convert_values("topple_az", topple_az, 2)
-        m3_port_pos = convert_values("m3_port_pos", m3_port_pos, 3)
+        topple_azimuth = convert_values("topple_azimuth", topple_azimuth, 2)
+        m3_port_positions = convert_values("m3_port_positions", m3_port_positions, 3)
         axis_encoder_counts_per_deg = convert_values("axis_encoder_counts_per_deg",
                                                      axis_encoder_counts_per_deg, 5)
         motor_encoder_counts_per_deg = convert_values("motor_encoder_counts_per_deg",
@@ -252,13 +252,13 @@ class ATMCSCsc(salobj.BaseCsc):
             raise ValueError(f"limit_overtravel={limit_overtravel} must be >= 0")
 
         self.max_tracking_interval = max_tracking_interval
-        self.pmin_cmd = pmin_cmd
-        self.pmax_cmd = pmax_cmd
-        self.pmin_lim = pmin_lim
-        self.pmax_lim = pmax_lim
+        self.min_commanded_position = min_commanded_position
+        self.max_commanded_position = max_commanded_position
+        self.min_limit_switch_position = min_limit_switch_position
+        self.max_limit_switch_position = max_limit_switch_position
         self.max_velocity = max_velocity
-        self.topple_az = topple_az
-        self.m3_port_pos = m3_port_pos
+        self.topple_azimuth = topple_azimuth
+        self.m3_port_positions = m3_port_positions
         self.axis_encoder_counts_per_deg = axis_encoder_counts_per_deg
         self.motor_encoder_counts_per_deg = motor_encoder_counts_per_deg
         self.motor_axis_ratio = motor_axis_ratio
@@ -270,8 +270,8 @@ class ATMCSCsc(salobj.BaseCsc):
 
         tai = salobj.current_tai()
         self.actuators = [simactuators.TrackingActuator(
-            min_position=self.pmin_cmd[axis],
-            max_position=self.pmax_cmd[axis],
+            min_position=self.min_commanded_position[axis],
+            max_position=self.max_commanded_position[axis],
             max_velocity=max_velocity[axis],
             max_acceleration=max_acceleration[axis],
             # Use 0 for M3 to prevent tracking.
@@ -282,7 +282,9 @@ class ATMCSCsc(salobj.BaseCsc):
         ) for axis in Axis]
         self.actuators[0].verbose = True
 
-        self.evt_positionLimits.set_put(minimum=pmin_cmd, maximum=pmax_cmd, force_output=True)
+        self.evt_positionLimits.set_put(minimum=min_commanded_position,
+                                        maximum=max_commanded_position,
+                                        force_output=True)
 
     def do_startTracking(self, data):
         self.assert_enabled("startTracking")
@@ -308,10 +310,12 @@ class ATMCSCsc(salobj.BaseCsc):
                                 data.nasmyth1RotatorAngleVelocity,
                                 data.nasmyth2RotatorAngleVelocity], dtype=float)
             dt = salobj.current_tai() - data.time
-            curr_pos = position + dt*velocity
-            if np.any(curr_pos < self.pmin_cmd[0:4]) or np.any(curr_pos > self.pmax_cmd[0:4]):
-                raise salobj.ExpectedError(f"One or more target positions {curr_pos} not in range "
-                                           f"{self.pmin_cmd} to {self.pmax_cmd} at the current time")
+            current_position = position + dt*velocity
+            if np.any(current_position < self.min_commanded_position[0:4]) \
+                    or np.any(current_position > self.max_commanded_position[0:4]):
+                raise salobj.ExpectedError(f"One or more target positions {current_position} not in range "
+                                           f"{self.min_commanded_position} to {self.max_commanded_position} "
+                                           "at the current time")
             if np.any(np.abs(velocity) > self.max_velocity[0:4]):
                 raise salobj.ExpectedError(f"Magnitude of one or more target velocities "
                                            f"{velocity} > {self.max_velocity}")
@@ -352,19 +356,19 @@ class ATMCSCsc(salobj.BaseCsc):
             raise salobj.ExpectedError("Cannot setInstrumentPort while tracking is enabled")
         port = data.port
         try:
-            m3_port_pos_ind = self._port_info_dict[port][0]
+            m3_port_positions_ind = self._port_info_dict[port][0]
         except IndexError:
             raise salobj.ExpectedError(f"Invalid port={port}")
         try:
-            m3_port_pos = self.m3_port_pos[m3_port_pos_ind]
+            m3_port_positions = self.m3_port_positions[m3_port_positions_ind]
         except IndexError:
-            raise RuntimeError(f"Bug! invalid m3_port_pos_ind={m3_port_pos_ind} for port={port}")
+            raise RuntimeError(f"Bug! invalid m3_port_positions_ind={m3_port_positions_ind} for port={port}")
         self.evt_m3PortSelected.set_put(selected=port)
         m3actuator = self.actuators[Axis.M3]
-        if m3actuator.target.position == m3_port_pos and self.evt_m3InPosition.data.inPosition:
+        if m3actuator.target.position == m3_port_positions and self.evt_m3InPosition.data.inPosition:
             # already there; don't do anything
             return
-        self.actuators[Axis.M3].set_target(tai=salobj.current_tai(), position=m3_port_pos, velocity=0)
+        self.actuators[Axis.M3].set_target(tai=salobj.current_tai(), position=m3_port_positions, velocity=0)
         self._axis_enabled[Axis.NA1] = False
         self._axis_enabled[Axis.NA2] = False
         self.update_events()
@@ -464,9 +468,9 @@ class ATMCSCsc(salobj.BaseCsc):
         """
         if not self.m3_in_position(tai):
             return (None, None)
-        cmd_pos = self.actuators[Axis.M3].target.position
+        target_position = self.actuators[Axis.M3].target.position
         for exit_port, (ind, m3state, rot_axis) in self._port_info_dict.items():
-            if self.m3_port_pos[ind] == cmd_pos:
+            if self.m3_port_positions[ind] == target_position:
                 return (exit_port, rot_axis)
         return (None, None)
 
@@ -481,9 +485,10 @@ class ATMCSCsc(salobj.BaseCsc):
         m3actuator = self.actuators[Axis.M3]
         if m3actuator.kind(tai) != m3actuator.Kind.Stopped:
             return False
-        m3cmd_pos = m3actuator.target.position
-        m3curr = m3actuator.path[-1].at(tai)
-        return abs(m3cmd_pos - m3curr.position) < self.m3tolerance
+        m3target_position = m3actuator.target.position
+        m3current = m3actuator.path[-1].at(tai)
+        m3position_difference = abs(m3target_position - m3current.position)
+        return m3position_difference < self.m3tolerance
 
     async def handle_summary_state(self):
         if self.summary_state == salobj.State.ENABLED:
@@ -567,7 +572,8 @@ class ATMCSCsc(salobj.BaseCsc):
         """
         try:
             tai = salobj.current_tai()
-            curr_pos = np.array([actuator.path.at(tai).position for actuator in self.actuators], dtype=float)
+            current_position = np.array([actuator.path.at(tai).position for actuator in self.actuators],
+                                        dtype=float)
             m3actuator = self.actuators[Axis.M3]
             axes_in_use = set([Axis.Elevation, Axis.Azimuth, Axis.M3])
 
@@ -589,14 +595,17 @@ class ATMCSCsc(salobj.BaseCsc):
             # and putting on their brakes (if any)
             abort_axes = []
             for axis in Axis:
-                self.set_event(self._min_lim_names[axis], active=curr_pos[axis] < self.pmin_lim[axis])
-                self.set_event(self._max_lim_names[axis], active=curr_pos[axis] > self.pmax_lim[axis])
-                if curr_pos[axis] < self.pmin_lim[axis] or curr_pos[axis] > self.pmax_lim[axis]:
+                self.set_event(self._min_lim_names[axis],
+                               active=current_position[axis] < self.min_limit_switch_position[axis])
+                self.set_event(self._max_lim_names[axis],
+                               active=current_position[axis] > self.max_limit_switch_position[axis])
+                if current_position[axis] < self.min_limit_switch_position[axis] \
+                        or current_position[axis] > self.max_limit_switch_position[axis]:
                     abort_axes.append(axis)
             for axis in abort_axes:
-                position = curr_pos[axis]
-                position = max(position, self.pmin_lim[axis] - self.limit_overtravel)
-                position = min(position, self.pmax_lim[axis] + self.limit_overtravel)
+                position = current_position[axis]
+                position = max(position, self.min_limit_switch_position[axis] - self.limit_overtravel)
+                position = min(position, self.max_limit_switch_position[axis] + self.limit_overtravel)
                 self.actuators[axis].abort(tai=tai, position=position)
                 self._axis_enabled[axis] = False
 
@@ -620,10 +629,10 @@ class ATMCSCsc(salobj.BaseCsc):
             self.evt_atMountState.set_put(state=mount_state)
 
             # Handle azimuth topple block
-            if curr_pos[Axis.Azimuth] < self.topple_az[0]:
+            if current_position[Axis.Azimuth] < self.topple_azimuth[0]:
                 self.evt_azimuthToppleBlockCCW.set_put(active=True)
                 self.evt_azimuthToppleBlockCW.set_put(active=False)
-            elif curr_pos[Axis.Azimuth] > self.topple_az[1]:
+            elif current_position[Axis.Azimuth] > self.topple_azimuth[1]:
                 self.evt_azimuthToppleBlockCCW.set_put(active=False)
                 self.evt_azimuthToppleBlockCW.set_put(active=True)
             else:
@@ -703,42 +712,42 @@ class ATMCSCsc(salobj.BaseCsc):
 
             for i, tai in enumerate(times):
                 segments = [actuator.path.at(tai) for actuator in self.actuators]
-                curr_pos = np.array([segment.position for segment in segments], dtype=float)
+                current_position = np.array([segment.position for segment in segments], dtype=float)
                 curr_vel = np.array([segment.velocity for segment in segments], dtype=float)
                 curr_accel = np.array([segment.acceleration for segment in segments], dtype=float)
 
-                axis_encoder_counts = (curr_pos*self.axis_encoder_counts_per_deg).astype(int)
+                axis_encoder_counts = (current_position*self.axis_encoder_counts_per_deg).astype(int)
                 torque = curr_accel*self.torque_per_accel
-                motor_pos = curr_pos * self.motor_axis_ratio
+                motor_pos = current_position * self.motor_axis_ratio
                 motor_pos = (motor_pos + 360) % 360 - 360
                 motor_encoder_counts = (motor_pos*self.motor_encoder_counts_per_deg).astype(int)
 
                 trajectory_data = self.tel_trajectory.data
-                trajectory_data.elevation[i] = curr_pos[Axis.Elevation]
-                trajectory_data.azimuth[i] = curr_pos[Axis.Azimuth]
-                trajectory_data.nasmyth1RotatorAngle[i] = curr_pos[Axis.NA1]
-                trajectory_data.nasmyth2RotatorAngle[i] = curr_pos[Axis.NA2]
+                trajectory_data.elevation[i] = current_position[Axis.Elevation]
+                trajectory_data.azimuth[i] = current_position[Axis.Azimuth]
+                trajectory_data.nasmyth1RotatorAngle[i] = current_position[Axis.NA1]
+                trajectory_data.nasmyth2RotatorAngle[i] = current_position[Axis.NA2]
                 trajectory_data.elevationVelocity[i] = curr_vel[Axis.Elevation]
                 trajectory_data.azimuthVelocity[i] = curr_vel[Axis.Azimuth]
                 trajectory_data.nasmyth1RotatorAngleVelocity[i] = curr_vel[Axis.NA1]
                 trajectory_data.nasmyth2RotatorAngleVelocity[i] = curr_vel[Axis.NA2]
 
                 azel_encoders_data = self.tel_mount_AzEl_Encoders.data
-                azel_encoders_data.elevationCalculatedAngle[i] = curr_pos[Axis.Elevation]
+                azel_encoders_data.elevationCalculatedAngle[i] = current_position[Axis.Elevation]
                 azel_encoders_data.elevationEncoder1Raw[i] = axis_encoder_counts[Axis.Elevation]
                 azel_encoders_data.elevationEncoder2Raw[i] = axis_encoder_counts[Axis.Elevation]
                 azel_encoders_data.elevationEncoder3Raw[i] = axis_encoder_counts[Axis.Elevation]
-                azel_encoders_data.azimuthCalculatedAngle[i] = curr_pos[Axis.Azimuth]
+                azel_encoders_data.azimuthCalculatedAngle[i] = current_position[Axis.Azimuth]
                 azel_encoders_data.azimuthEncoder1Raw[i] = axis_encoder_counts[Axis.Azimuth]
                 azel_encoders_data.azimuthEncoder2Raw[i] = axis_encoder_counts[Axis.Azimuth]
                 azel_encoders_data.azimuthEncoder3Raw[i] = axis_encoder_counts[Axis.Azimuth]
 
                 nasmyth_encoders_data = self.tel_mount_Nasmyth_Encoders.data
-                nasmyth_encoders_data.nasmyth1CalculatedAngle[i] = curr_pos[Axis.NA1]
+                nasmyth_encoders_data.nasmyth1CalculatedAngle[i] = current_position[Axis.NA1]
                 nasmyth_encoders_data.nasmyth1Encoder1Raw[i] = axis_encoder_counts[Axis.NA1]
                 nasmyth_encoders_data.nasmyth1Encoder2Raw[i] = axis_encoder_counts[Axis.NA1]
                 nasmyth_encoders_data.nasmyth1Encoder3Raw[i] = axis_encoder_counts[Axis.NA1]
-                nasmyth_encoders_data.nasmyth2CalculatedAngle[i] = curr_pos[Axis.NA2]
+                nasmyth_encoders_data.nasmyth2CalculatedAngle[i] = current_position[Axis.NA2]
                 nasmyth_encoders_data.nasmyth2Encoder1Raw[i] = axis_encoder_counts[Axis.NA2]
                 nasmyth_encoders_data.nasmyth2Encoder2Raw[i] = axis_encoder_counts[Axis.NA2]
                 nasmyth_encoders_data.nasmyth2Encoder3Raw[i] = axis_encoder_counts[Axis.NA2]
