@@ -133,6 +133,7 @@ class CscTestCase(asynctest.TestCase):
                     "softwareVersions",  # not yet supported by salobj
                     "appliedSettingsMatchStart", "detailedState",
                     "errorCode", "logMessage", "settingVersions",
+                    "settingsApplied",  # not yet supported by salobj
                 ):
                     continue
                 with self.subTest(event_name=event_name):
