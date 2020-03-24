@@ -296,7 +296,6 @@ class ATMCSCsc(salobj.BaseCsc):
                 max_velocity=max_velocity[axis],
                 max_acceleration=max_acceleration[axis],
                 # Use 0 for M3 to prevent tracking.
-                # TODO DM-21957: replace M3 actuator with a point to point actuator
                 dtmax_track=0 if axis == 4 else self.max_tracking_interval,
                 nsettle=self.nsettle,
                 tai=tai,
