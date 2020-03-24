@@ -155,7 +155,7 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
             # Cannot send trackTarget while tracking disabled;
             # this error does not change the summary state.
             self.remote.cmd_trackTarget.set(
-                time=salobj.current_tai(), **good_target_kwargs
+                taiTime=salobj.current_tai(), **good_target_kwargs
             )
             with salobj.assertRaisesAckError():
                 await self.remote.cmd_trackTarget.start(timeout=1)
@@ -196,7 +196,7 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
                         min_commanded_position[axis] - 0.000001
                     )
                     self.remote.cmd_trackTarget.set(
-                        time=salobj.current_tai(), **min_position_kwargs
+                        taiTime=salobj.current_tai(), **min_position_kwargs
                     )
                     with salobj.assertRaisesAckError():
                         await self.remote.cmd_trackTarget.start(timeout=1)
@@ -216,7 +216,7 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
                         max_commanded_position[axis] + 0.000001
                     )
                     self.remote.cmd_trackTarget.set(
-                        time=salobj.current_tai(), **max_position_kwargs
+                        taiTime=salobj.current_tai(), **max_position_kwargs
                     )
                     with salobj.assertRaisesAckError():
                         await self.remote.cmd_trackTarget.start(timeout=1)
@@ -236,7 +236,7 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
                         max_velocity[axis] + 0.000001
                     )
                     self.remote.cmd_trackTarget.set(
-                        time=salobj.current_tai(), **max_velocity_kwargs
+                        taiTime=salobj.current_tai(), **max_velocity_kwargs
                     )
                     with salobj.assertRaisesAckError():
                         await self.remote.cmd_trackTarget.start(timeout=1)
@@ -257,7 +257,7 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
             way_out_kwargs["elevation"] = 85
             way_out_kwargs["elevationVelocity"] = -2
             self.remote.cmd_trackTarget.set(
-                time=salobj.current_tai() + 10, **way_out_kwargs
+                taiTime=salobj.current_tai() + 10, **way_out_kwargs
             )
             with salobj.assertRaisesAckError():
                 await self.remote.cmd_trackTarget.start(timeout=1)
@@ -460,7 +460,7 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
             trackId = 20  # arbitary
             while True:
                 tai = salobj.current_tai() + 0.1  # offset is arbitrary but reasonable
-                self.remote.cmd_trackTarget.set(time=tai, trackId=trackId)
+                self.remote.cmd_trackTarget.set(taiTime=tai, trackId=trackId)
                 for axis_name, path in paths.items():
                     segment = path.at(tai)
                     kwargs = {
@@ -537,7 +537,7 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
             )
 
             self.remote.cmd_trackTarget.set(
-                elevation=10, time=salobj.current_tai(), trackId=20,  # arbitary
+                elevation=10, taiTime=salobj.current_tai(), trackId=20,  # arbitary
             )
             await self.remote.cmd_trackTarget.start(timeout=1)
 
@@ -582,7 +582,7 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
             trackId = 35  # arbitary
 
             tai = start_tai + 0.1  # offset is arbitrary but reasonable
-            self.remote.cmd_trackTarget.set(time=tai, trackId=trackId)
+            self.remote.cmd_trackTarget.set(taiTime=tai, trackId=trackId)
             for axis_name, path in paths.items():
                 segment = path.at(tai)
                 kwargs = {
@@ -599,7 +599,7 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
                 self.remote.evt_atMountState, state=AtMountState.STOPPING
             )
 
-            await asyncio.sleep(0.2)  # give events time to arrive
+            await asyncio.sleep(0.2)  # Give events time to arrive.
 
             for event in self.in_position_events:
                 desired_in_position = event is self.remote.evt_m3InPosition
@@ -638,7 +638,7 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
             trackId = 35  # arbitary
 
             tai = start_tai + 0.1  # offset is arbitrary but reasonable
-            self.remote.cmd_trackTarget.set(time=tai, trackId=trackId)
+            self.remote.cmd_trackTarget.set(taiTime=tai, trackId=trackId)
             for axis_name, path in paths.items():
                 segment = path.at(tai)
                 kwargs = {
@@ -655,7 +655,7 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
                 self.remote.evt_atMountState, state=AtMountState.STOPPING
             )
 
-            await asyncio.sleep(0.2)  # give events time to arrive
+            await asyncio.sleep(0.2)  # Give events time to arrive.
 
             for event in self.in_position_events:
                 desired_in_position = event is self.remote.evt_m3InPosition
@@ -683,7 +683,7 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
             "nasmyth1RotatorAngleVelocity",
             "nasmyth2RotatorAngle",
             "nasmyth2RotatorAngleVelocity",
-            "time",
+            "taiTime",
             "trackId",
         ):
             self.assertAlmostEqual(getattr(target1, field), getattr(target2, field))

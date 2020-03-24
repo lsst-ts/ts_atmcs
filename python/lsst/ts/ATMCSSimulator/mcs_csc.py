@@ -345,7 +345,7 @@ class ATMCSCsc(salobj.BaseCsc):
                 ],
                 dtype=float,
             )
-            dt = salobj.current_tai() - data.time
+            dt = salobj.current_tai() - data.taiTime
             current_position = position + dt * velocity
             if np.any(current_position < self.min_commanded_position[0:4]) or np.any(
                 current_position > self.max_commanded_position[0:4]
@@ -366,7 +366,7 @@ class ATMCSCsc(salobj.BaseCsc):
 
         for i in range(4):
             self.actuators[i].set_target(
-                tai=data.time, position=position[i], velocity=velocity[i]
+                tai=data.taiTime, position=position[i], velocity=velocity[i]
             )
 
         target_fields = (
@@ -378,7 +378,7 @@ class ATMCSCsc(salobj.BaseCsc):
             "nasmyth1RotatorAngleVelocity",
             "nasmyth2RotatorAngle",
             "nasmyth2RotatorAngleVelocity",
-            "time",
+            "taiTime",
             "trackId",
             "tracksys",
             "radesys",
