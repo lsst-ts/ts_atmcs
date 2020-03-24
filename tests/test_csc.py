@@ -131,8 +131,11 @@ class CscTestCase(asynctest.TestCase):
                     "target",  # output by trackTarget
                     "summaryState",  # already read
                     "softwareVersions",  # not yet supported by salobj
-                    "appliedSettingsMatchStart", "detailedState",
-                    "errorCode", "logMessage", "settingVersions",
+                    "appliedSettingsMatchStart",
+                    "detailedState",
+                    "errorCode",
+                    "logMessage",
+                    "settingVersions",
                     "settingsApplied",  # not yet supported by salobj
                 ):
                     continue
@@ -152,12 +155,12 @@ class CscTestCase(asynctest.TestCase):
         async with Harness(initial_state=salobj.State.ENABLED) as harness:
             min_commanded_position = (5, -270, -165, -165, 0)
             max_commanded_position = (90, 270, 165, 165, 180)
-            max_velocity = (100,)*5
+            max_velocity = (100,) * 5
             harness.csc.configure(
                 min_commanded_position=min_commanded_position,
                 max_commanded_position=max_commanded_position,
                 max_velocity=max_velocity,
-                max_acceleration=(200,)*5,
+                max_acceleration=(200,) * 5,
             )
             good_target_kwargs = dict((name, 0) for name in self.axis_names)
             # elevation does not have 0 in its valid range
@@ -174,7 +177,9 @@ class CscTestCase(asynctest.TestCase):
 
             # cannot send trackTarget while tracking disabled;
             # this error does not change the summary state
-            harness.remote.cmd_trackTarget.set(time=salobj.current_tai(), **good_target_kwargs)
+            harness.remote.cmd_trackTarget.set(
+                time=salobj.current_tai(), **good_target_kwargs
+            )
             with salobj.assertRaisesAckError():
                 await harness.remote.cmd_trackTarget.start(timeout=1)
 
@@ -205,8 +210,12 @@ class CscTestCase(asynctest.TestCase):
                     self.assertEqual(data.state, AtMountState.TRACKINGENABLED)
 
                     min_position_kwargs = good_target_kwargs.copy()
-                    min_position_kwargs[self.axis_names[axis]] = min_commanded_position[axis] - 0.000001
-                    harness.remote.cmd_trackTarget.set(time=salobj.current_tai(), **min_position_kwargs)
+                    min_position_kwargs[self.axis_names[axis]] = (
+                        min_commanded_position[axis] - 0.000001
+                    )
+                    harness.remote.cmd_trackTarget.set(
+                        time=salobj.current_tai(), **min_position_kwargs
+                    )
                     with salobj.assertRaisesAckError():
                         await harness.remote.cmd_trackTarget.start(timeout=1)
                     data = await harness.next_event("atMountState", timeout=STD_TIMEOUT)
@@ -218,8 +227,12 @@ class CscTestCase(asynctest.TestCase):
                     self.assertEqual(data.state, AtMountState.TRACKINGENABLED)
 
                     max_position_kwargs = good_target_kwargs.copy()
-                    max_position_kwargs[self.axis_names[axis]] = max_commanded_position[axis] + 0.000001
-                    harness.remote.cmd_trackTarget.set(time=salobj.current_tai(), **max_position_kwargs)
+                    max_position_kwargs[self.axis_names[axis]] = (
+                        max_commanded_position[axis] + 0.000001
+                    )
+                    harness.remote.cmd_trackTarget.set(
+                        time=salobj.current_tai(), **max_position_kwargs
+                    )
                     with salobj.assertRaisesAckError():
                         await harness.remote.cmd_trackTarget.start(timeout=1)
                     data = await harness.next_event("atMountState")
@@ -231,9 +244,12 @@ class CscTestCase(asynctest.TestCase):
                     self.assertEqual(data.state, AtMountState.TRACKINGENABLED)
 
                     max_velocity_kwargs = good_target_kwargs.copy()
-                    max_velocity_kwargs[f"{self.axis_names[axis]}Velocity"] = \
+                    max_velocity_kwargs[f"{self.axis_names[axis]}Velocity"] = (
                         max_velocity[axis] + 0.000001
-                    harness.remote.cmd_trackTarget.set(time=salobj.current_tai(), **max_velocity_kwargs)
+                    )
+                    harness.remote.cmd_trackTarget.set(
+                        time=salobj.current_tai(), **max_velocity_kwargs
+                    )
                     with salobj.assertRaisesAckError():
                         await harness.remote.cmd_trackTarget.start(timeout=1)
                     data = await harness.next_event("atMountState", timeout=STD_TIMEOUT)
@@ -249,7 +265,9 @@ class CscTestCase(asynctest.TestCase):
             way_out_kwargs = good_target_kwargs.copy()
             way_out_kwargs["elevation"] = 85
             way_out_kwargs["elevationVelocity"] = -2
-            harness.remote.cmd_trackTarget.set(time=salobj.current_tai() + 10, **way_out_kwargs)
+            harness.remote.cmd_trackTarget.set(
+                time=salobj.current_tai() + 10, **way_out_kwargs
+            )
             with salobj.assertRaisesAckError():
                 await harness.remote.cmd_trackTarget.start(timeout=1)
             data = await harness.next_event("atMountState")
@@ -260,7 +278,9 @@ class CscTestCase(asynctest.TestCase):
         """Test standard CSC state transitions.
         """
         async with Harness(initial_state=salobj.State.STANDBY) as harness:
-            state = await harness.remote.evt_summaryState.next(flush=False, timeout=STD_TIMEOUT)
+            state = await harness.remote.evt_summaryState.next(
+                flush=False, timeout=STD_TIMEOUT
+            )
             self.assertEqual(state.summaryState, salobj.State.STANDBY)
 
             print("Starting test; check that brakes are engaged")
@@ -276,14 +296,18 @@ class CscTestCase(asynctest.TestCase):
             print("Send start; brakes are still engaged")
             await harness.remote.cmd_start.start()
             self.assertEqual(harness.csc.summary_state, salobj.State.DISABLED)
-            state = await harness.remote.evt_summaryState.next(flush=False, timeout=STD_TIMEOUT)
+            state = await harness.remote.evt_summaryState.next(
+                flush=False, timeout=STD_TIMEOUT
+            )
             self.assertEqual(state.summaryState, salobj.State.DISABLED)
 
             # send enable; new state is ENABLED
             print("Send enable; check that brakes are disengaged")
             await harness.remote.cmd_enable.start()
             self.assertEqual(harness.csc.summary_state, salobj.State.ENABLED)
-            state = await harness.remote.evt_summaryState.next(flush=False, timeout=STD_TIMEOUT)
+            state = await harness.remote.evt_summaryState.next(
+                flush=False, timeout=STD_TIMEOUT
+            )
             self.assertEqual(state.summaryState, salobj.State.ENABLED)
 
             # the following axes should be enabled:
@@ -303,7 +327,9 @@ class CscTestCase(asynctest.TestCase):
             # send disable; new state is DISABLED
             await harness.remote.cmd_disable.start()
             self.assertEqual(harness.csc.summary_state, salobj.State.DISABLED)
-            state = await harness.remote.evt_summaryState.next(flush=False, timeout=STD_TIMEOUT)
+            state = await harness.remote.evt_summaryState.next(
+                flush=False, timeout=STD_TIMEOUT
+            )
             self.assertEqual(state.summaryState, salobj.State.DISABLED)
 
             for event_name in self.brake_names:
@@ -321,13 +347,17 @@ class CscTestCase(asynctest.TestCase):
             # send standby; new state is STANDBY
             await harness.remote.cmd_standby.start()
             self.assertEqual(harness.csc.summary_state, salobj.State.STANDBY)
-            state = await harness.remote.evt_summaryState.next(flush=False, timeout=STD_TIMEOUT)
+            state = await harness.remote.evt_summaryState.next(
+                flush=False, timeout=STD_TIMEOUT
+            )
             self.assertEqual(state.summaryState, salobj.State.STANDBY)
 
             # send exitControl; new state is OFFLINE
             await harness.remote.cmd_exitControl.start()
             self.assertEqual(harness.csc.summary_state, salobj.State.OFFLINE)
-            state = await harness.remote.evt_summaryState.next(flush=False, timeout=STD_TIMEOUT)
+            state = await harness.remote.evt_summaryState.next(
+                flush=False, timeout=STD_TIMEOUT
+            )
             self.assertEqual(state.summaryState, salobj.State.OFFLINE)
 
             await asyncio.wait_for(harness.csc.done_task, 5)
@@ -335,8 +365,7 @@ class CscTestCase(asynctest.TestCase):
     async def test_set_instrument_port(self):
         async with Harness(initial_state=salobj.State.ENABLED) as harness:
             harness.csc.configure(
-                max_velocity=(100,)*5,
-                max_acceleration=(200,)*5,
+                max_velocity=(100,) * 5, max_acceleration=(200,) * 5,
             )
             state = await harness.remote.evt_summaryState.next(flush=False, timeout=5)
             self.assertEqual(state.summaryState, salobj.State.ENABLED)
@@ -344,8 +373,9 @@ class CscTestCase(asynctest.TestCase):
             data = await harness.next_event("m3State")
             self.assertEqual(data.state, M3State.NASMYTH1)
 
-            await harness.remote.cmd_setInstrumentPort.set_start(port=M3ExitPort.PORT3,
-                                                                 timeout=STD_TIMEOUT)
+            await harness.remote.cmd_setInstrumentPort.set_start(
+                port=M3ExitPort.PORT3, timeout=STD_TIMEOUT
+            )
 
             data = await harness.next_event("m3PortSelected")
             self.assertEqual(data.selected, M3ExitPort.PORT3)
@@ -380,8 +410,9 @@ class CscTestCase(asynctest.TestCase):
             data = harness.remote.evt_nasmyth2DriveStatus.get(flush=True)
             self.assertFalse(data.enable)
 
-            await harness.remote.cmd_setInstrumentPort.set_start(port=M3ExitPort.NASMYTH2,
-                                                                 timeout=STD_TIMEOUT)
+            await harness.remote.cmd_setInstrumentPort.set_start(
+                port=M3ExitPort.NASMYTH2, timeout=STD_TIMEOUT
+            )
 
             start_tai = salobj.current_tai()
             data = await harness.next_event("m3State", timeout=2)
@@ -408,8 +439,7 @@ class CscTestCase(asynctest.TestCase):
     async def test_track(self):
         async with Harness(initial_state=salobj.State.ENABLED) as harness:
             harness.csc.configure(
-                max_velocity=(100,)*5,
-                max_acceleration=(200,)*5,
+                max_velocity=(100,) * 5, max_acceleration=(200,) * 5,
             )
             state = await harness.remote.evt_summaryState.next(flush=False, timeout=5)
             self.assertEqual(state.summaryState, salobj.State.ENABLED)
@@ -442,11 +472,15 @@ class CscTestCase(asynctest.TestCase):
 
             start_tai = salobj.current_tai()
             paths = dict(
-                elevation=simactuators.path.PathSegment(tai=start_tai, position=6, velocity=0.001),
-                azimuth=simactuators.path.PathSegment(tai=start_tai, position=5, velocity=-0.001),
-                nasmyth1RotatorAngle=simactuators.path.PathSegment(tai=start_tai,
-                                                                   position=1,
-                                                                   velocity=-0.001),
+                elevation=simactuators.path.PathSegment(
+                    tai=start_tai, position=6, velocity=0.001
+                ),
+                azimuth=simactuators.path.PathSegment(
+                    tai=start_tai, position=5, velocity=-0.001
+                ),
+                nasmyth1RotatorAngle=simactuators.path.PathSegment(
+                    tai=start_tai, position=1, velocity=-0.001
+                ),
             )
             trackId = 20  # arbitary
             while True:
@@ -462,7 +496,9 @@ class CscTestCase(asynctest.TestCase):
                 await harness.remote.cmd_trackTarget.start(timeout=1)
 
                 target = await harness.remote.evt_target.next(flush=False, timeout=1)
-                self.assertTargetsAlmostEqual(harness.remote.cmd_trackTarget.data, target)
+                self.assertTargetsAlmostEqual(
+                    harness.remote.cmd_trackTarget.data, target
+                )
 
                 data = harness.remote.evt_allAxesInPosition.get()
                 if data.inPosition:
@@ -494,8 +530,8 @@ class CscTestCase(asynctest.TestCase):
         async with Harness(initial_state=salobj.State.ENABLED) as harness:
             harness.csc.configure(
                 max_tracking_interval=max_tracking_interval,
-                max_velocity=(100,)*5,
-                max_acceleration=(200,)*5,
+                max_velocity=(100,) * 5,
+                max_acceleration=(200,) * 5,
             )
             state = await harness.remote.evt_summaryState.next(flush=False, timeout=5)
             self.assertEqual(state.summaryState, salobj.State.ENABLED)
@@ -511,7 +547,9 @@ class CscTestCase(asynctest.TestCase):
             self.assertEqual(data.state, AtMountState.TRACKINGENABLED)
 
             # wait too long for trackTarget
-            data = await harness.next_event("atMountState", timeout=max_tracking_interval + 0.2)
+            data = await harness.next_event(
+                "atMountState", timeout=max_tracking_interval + 0.2
+            )
             self.assertEqual(data.state, AtMountState.TRACKINGDISABLED)
             await self.fault_to_enabled(harness)
 
@@ -522,14 +560,14 @@ class CscTestCase(asynctest.TestCase):
             self.assertEqual(data.state, AtMountState.TRACKINGENABLED)
 
             harness.remote.cmd_trackTarget.set(
-                elevation=10,
-                time=salobj.current_tai(),
-                trackId=20,  # arbitary
+                elevation=10, time=salobj.current_tai(), trackId=20,  # arbitary
             )
             await harness.remote.cmd_trackTarget.start(timeout=1)
 
             # wait too long for trackTarget
-            data = await harness.next_event("atMountState", timeout=max_tracking_interval + 0.2)
+            data = await harness.next_event(
+                "atMountState", timeout=max_tracking_interval + 0.2
+            )
             self.assertEqual(data.state, AtMountState.STOPPING)
 
             data = await harness.next_event("atMountState", timeout=STD_TIMEOUT)
@@ -555,7 +593,9 @@ class CscTestCase(asynctest.TestCase):
             paths = dict(
                 elevation=simactuators.path.PathSegment(tai=start_tai, position=45),
                 azimuth=simactuators.path.PathSegment(tai=start_tai, position=100),
-                nasmyth1RotatorAngle=simactuators.path.PathSegment(tai=start_tai, position=90),
+                nasmyth1RotatorAngle=simactuators.path.PathSegment(
+                    tai=start_tai, position=90
+                ),
             )
             trackId = 35  # arbitary
 
@@ -608,7 +648,9 @@ class CscTestCase(asynctest.TestCase):
             paths = dict(
                 elevation=simactuators.path.PathSegment(tai=start_tai, position=45),
                 azimuth=simactuators.path.PathSegment(tai=start_tai, position=100),
-                nasmyth1RotatorAngle=simactuators.path.PathSegment(tai=start_tai, position=90),
+                nasmyth1RotatorAngle=simactuators.path.PathSegment(
+                    tai=start_tai, position=90
+                ),
             )
             trackId = 35  # arbitary
 
@@ -650,11 +692,18 @@ class CscTestCase(asynctest.TestCase):
             The targets to compare. These may be instances of trackTarget
             command data or target event data.
         """
-        for field in ("azimuth", "azimuthVelocity",
-                      "elevation", "elevationVelocity",
-                      "nasmyth1RotatorAngle", "nasmyth1RotatorAngleVelocity",
-                      "nasmyth2RotatorAngle", "nasmyth2RotatorAngleVelocity",
-                      "time", "trackId"):
+        for field in (
+            "azimuth",
+            "azimuthVelocity",
+            "elevation",
+            "elevationVelocity",
+            "nasmyth1RotatorAngle",
+            "nasmyth1RotatorAngleVelocity",
+            "nasmyth2RotatorAngle",
+            "nasmyth2RotatorAngleVelocity",
+            "time",
+            "trackId",
+        ):
             self.assertAlmostEqual(getattr(target1, field), getattr(target2, field))
 
 
