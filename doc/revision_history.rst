@@ -24,6 +24,19 @@ Requires:
 * ts_xml 4.9
 * IDL file for ATMCS, e.g. built with make_idl_files.py
 
+v0.10.1
+=======
+
+Major changes:
+
+* Added jenkins build.
+
+Requires:
+
+* ts_salobj 5.2
+* ts_simactuators 0.1
+* ts_idl 1
+* IDL file for ATMCS, e.g. built with make_idl_files.py
 
 v0.10.0
 =======
