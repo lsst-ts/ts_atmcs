@@ -45,10 +45,6 @@ Python API reference
    :no-main-docstr:
    :no-inheritance-diagram:
 
-.. automodapi:: lsst.ts.ATMCSSimulator.path
-   :no-main-docstr:
-   :no-inheritance-diagram:
-
 Revision History
 ================
 
