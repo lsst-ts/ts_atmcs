@@ -4,7 +4,7 @@ ts_ATMCSSimulator
 
 ``ts_ATMCSSimulator`` is an LSST Telescope and Site package that provides a simulator for the auxiliary telescope motor control system (ATMCS).
 
-`Documentation <https://ts-atmscsimulator.lsst.io>`_
+`Documentation <https://ts-atmcssimulator.lsst.io>`_
 
 The package is compatible with the `eups <https://github.com/RobertLuptonTheGood/eups>`_ package management system and ``scons`` build system.
 Assuming you have the basic Vera C. Rubin LSST DM stack installed you can do the following, from within the package directory:
