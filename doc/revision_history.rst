@@ -6,6 +6,19 @@
 ts_ATMCSSimulator Revision History
 ##################################
 
+v1.0.0
+=======
+
+First release. No changes from v0.11.0.
+
+Requires:
+
+* ts_salobj 5.4
+* ts_simactuators 1.0
+* ts_idl 1
+* ts_xml 4.9
+* IDL file for ATMCS, e.g. built with make_idl_files.py
+
 v0.11.0
 =======
 
