@@ -34,7 +34,7 @@ Contributing
 ============
 
 ``lsst.ts.ATMCSSimulator`` is developed at https://github.com/lsst-ts/ts_ATMCSSimulator.
-You can find Jira issues for this module under the `ts_ATMCSSimulator <https://jira.lsstcorp.org/issues/?jql=project%20%3D%20DM%20AND%20component%20%3D%20ts_ATMCSSimulator>`_ component.
+You can find Jira issues for this module using `labels=ts_ATMCSSimulator <https://jira.lsstcorp.org/issues/?jql=project%20%3D%20DM%20AND%20labels%20%20%3D%20ts_ATMCSSimulator>`_.
 
 .. _lsst.ts.ATMCSSimulator-pyapi:
 
@@ -45,6 +45,9 @@ Python API reference
    :no-main-docstr:
    :no-inheritance-diagram:
 
-.. automodapi:: lsst.ts.ATMCSSimulator.path
-   :no-main-docstr:
-   :no-inheritance-diagram:
+Revision History
+================
+
+.. toctree::
+    revision_history
+    :maxdepth: 1
