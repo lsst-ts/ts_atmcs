@@ -70,11 +70,11 @@ pipeline {
                 }
             }
         }
-        stage("Install config_attcs") {
+        stage("Checkout config_attcs") {
             steps {
                 script {
                     sh """
-                    docker exec -u saluser \${container_name} sh -c \"source ~/.setup.sh && cd /home/saluser/repos/ && git clone https://github.com/lsst-ts/ts_config_attcs.git && cd /home/saluser/repos/ts_config_attcs/ && /home/saluser/.checkout_repo.sh \${work_branches} && git pull && eups declare -r . -t saluser\"
+                    docker exec -u saluser \${container_name} sh -c \"source ~/.setup.sh && cd /home/saluser/repos/ts_config_attcs/ && /home/saluser/.checkout_repo.sh \${work_branches} && git pull && eups declare -r . -t saluser\"
                     """
                 }
             }
