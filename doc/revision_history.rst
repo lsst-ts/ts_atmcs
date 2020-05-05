@@ -6,6 +6,13 @@
 ts_ATMCSSimulator Revision History
 ##################################
 
+v1.0.1
+======
+
+* Include conda package build configuration.
+* Added a Jenkinsfile to support continuous integration and to build conda packages.
+* Fix Jenkinsfile for CI job.
+
 v1.0.0
 =======
 
