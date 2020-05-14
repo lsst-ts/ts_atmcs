@@ -2,16 +2,45 @@
 
 .. _lsst.ts.ATMCSSimulator.revision_history:
 
-##################################
-ts_ATMCSSimulator Revision History
-##################################
+################
+Revision History
+################
+
+v1.0.2
+======
+
+Changes:
+
+* Add a test that code is formatted with black.
+  This requires ts_salobj 5.11.
+* Add a test for ``bin/run_atmcs_simulator.py``.
+* Fix f strings with no {}.
+* Remove ``sudo: false`` from ``.travis.yml``.
+
+Requires:
+
+* ts_salobj 5.11
+* ts_simactuators 1.0
+* ts_idl 1
+* ts_xml 4.9
+* IDL file for ATMCS, e.g. built with make_idl_files.py
 
 v1.0.1
 ======
 
+Changes:
+
 * Include conda package build configuration.
 * Added a Jenkinsfile to support continuous integration and to build conda packages.
 * Fix Jenkinsfile for CI job.
+
+Requires:
+
+* ts_salobj 5.4
+* ts_simactuators 1.0
+* ts_idl 1
+* ts_xml 4.9
+* IDL file for ATMCS, e.g. built with make_idl_files.py
 
 v1.0.0
 =======
