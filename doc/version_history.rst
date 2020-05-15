@@ -1,10 +1,10 @@
 .. py:currentmodule:: lsst.ts.ATMCSSimulator
 
-.. _lsst.ts.ATMCSSimulator.revision_history:
+.. _lsst.ts.ATMCSSimulator.version_history:
 
-################
-Revision History
-################
+###############
+Version History
+###############
 
 v1.0.2
 ======
