@@ -357,7 +357,7 @@ class ATMCSCsc(salobj.BaseCsc):
                 )
             if np.any(np.abs(velocity) > self.max_velocity[0:4]):
                 raise salobj.ExpectedError(
-                    f"Magnitude of one or more target velocities "
+                    "Magnitude of one or more target velocities "
                     f"{velocity} > {self.max_velocity}"
                 )
         except Exception as e:

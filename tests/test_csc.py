@@ -412,6 +412,11 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
             data = self.remote.evt_nasmyth1DriveStatus.get()
             self.assertFalse(data.enable)
 
+    async def test_bin_script(self):
+        await self.check_bin_script(
+            name="ATMCS", index=None, exe_name="run_atmcs_simulator.py"
+        )
+
     async def test_track(self):
         async with self.make_csc(initial_state=salobj.State.ENABLED):
             self.csc.configure(
