@@ -6,6 +6,21 @@
 Version History
 ###############
 
+v1.0.3
+======
+
+Changes:
+
+* Update for compatibility with ts_salobj 5.13.
+
+Requires:
+
+* ts_salobj 5.11
+* ts_simactuators 1.0
+* ts_idl 1
+* ts_xml 4.9
+* IDL file for ATMCS, e.g. built with make_idl_files.py
+
 v1.0.2
 ======
 

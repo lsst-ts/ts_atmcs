@@ -451,7 +451,7 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
                 await self.remote.cmd_setInstrumentPort.start()
 
             start_tai = salobj.current_tai()
-            paths = dict(
+            path_dict = dict(
                 elevation=simactuators.path.PathSegment(
                     tai=start_tai, position=6, velocity=0.001
                 ),
@@ -465,15 +465,10 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
             trackId = 20  # arbitary
             while True:
                 tai = salobj.current_tai() + 0.1  # offset is arbitrary but reasonable
-                self.remote.cmd_trackTarget.set(taiTime=tai, trackId=trackId)
-                for axis_name, path in paths.items():
-                    segment = path.at(tai)
-                    kwargs = {
-                        axis_name: segment.position,
-                        f"{axis_name}Velocity": segment.velocity,
-                    }
-                    self.remote.cmd_trackTarget.set(**kwargs)
-                await self.remote.cmd_trackTarget.start(timeout=1)
+                target_kwargs = self.compute_track_target_kwargs(
+                    tai=tai, path_dict=path_dict, trackId=trackId
+                )
+                await self.remote.cmd_trackTarget.set_start(**target_kwargs, timeout=1)
 
                 target = await self.remote.evt_target.next(flush=False, timeout=1)
                 self.assertTargetsAlmostEqual(self.remote.cmd_trackTarget.data, target)
@@ -541,10 +536,9 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
                 self.remote.evt_atMountState, state=AtMountState.TRACKINGENABLED
             )
 
-            self.remote.cmd_trackTarget.set(
-                elevation=10, taiTime=salobj.current_tai(), trackId=20,  # arbitary
+            await self.remote.cmd_trackTarget.set_start(
+                elevation=10, taiTime=salobj.current_tai(), trackId=20, timeout=1
             )
-            await self.remote.cmd_trackTarget.start(timeout=1)
 
             # wait too long for trackTarget
             await self.assert_next_sample(
@@ -577,7 +571,7 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
             )
 
             start_tai = salobj.current_tai()
-            paths = dict(
+            path_dict = dict(
                 elevation=simactuators.path.PathSegment(tai=start_tai, position=45),
                 azimuth=simactuators.path.PathSegment(tai=start_tai, position=100),
                 nasmyth1RotatorAngle=simactuators.path.PathSegment(
@@ -587,15 +581,10 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
             trackId = 35  # arbitary
 
             tai = start_tai + 0.1  # offset is arbitrary but reasonable
-            self.remote.cmd_trackTarget.set(taiTime=tai, trackId=trackId)
-            for axis_name, path in paths.items():
-                segment = path.at(tai)
-                kwargs = {
-                    axis_name: segment.position,
-                    f"{axis_name}Velocity": segment.velocity,
-                }
-                self.remote.cmd_trackTarget.set(**kwargs)
-            await self.remote.cmd_trackTarget.start(timeout=1)
+            target_kwargs = self.compute_track_target_kwargs(
+                tai=tai, path_dict=path_dict, trackId=trackId
+            )
+            await self.remote.cmd_trackTarget.set_start(**target_kwargs, timeout=1)
 
             await asyncio.sleep(0.2)
 
@@ -633,7 +622,7 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
             )
 
             start_tai = salobj.current_tai()
-            paths = dict(
+            path_dict = dict(
                 elevation=simactuators.path.PathSegment(tai=start_tai, position=45),
                 azimuth=simactuators.path.PathSegment(tai=start_tai, position=100),
                 nasmyth1RotatorAngle=simactuators.path.PathSegment(
@@ -643,15 +632,10 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
             trackId = 35  # arbitary
 
             tai = start_tai + 0.1  # offset is arbitrary but reasonable
-            self.remote.cmd_trackTarget.set(taiTime=tai, trackId=trackId)
-            for axis_name, path in paths.items():
-                segment = path.at(tai)
-                kwargs = {
-                    axis_name: segment.position,
-                    f"{axis_name}Velocity": segment.velocity,
-                }
-                self.remote.cmd_trackTarget.set(**kwargs)
-            await self.remote.cmd_trackTarget.start(timeout=1)
+            target_kwargs = self.compute_track_target_kwargs(
+                tai=tai, path_dict=path_dict, trackId=trackId
+            )
+            await self.remote.cmd_trackTarget.set_start(**target_kwargs, timeout=1)
 
             await asyncio.sleep(0.2)
 
@@ -692,6 +676,26 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
             "trackId",
         ):
             self.assertAlmostEqual(getattr(target1, field), getattr(target2, field))
+
+    def compute_track_target_kwargs(self, tai, path_dict, trackId):
+        """Compute keyword arguments for the trackTarget command.
+
+        Parameters
+        ----------
+        tai : `float`
+            TAI date, unix seconds.
+        path_dict : `dict`
+            Dict of axis name: path (an lsst.ts.simactuators.path.Path
+            or PathSegment).
+        trackId : `int`
+            Tracking ID.
+        """
+        target_kwargs = dict(taiTime=tai, trackId=trackId)
+        for axis_name, path in path_dict.items():
+            segment = path.at(tai)
+            target_kwargs[axis_name] = segment.position
+            target_kwargs[f"{axis_name}Velocity"] = segment.velocity
+        return target_kwargs
 
 
 if __name__ == "__main__":
