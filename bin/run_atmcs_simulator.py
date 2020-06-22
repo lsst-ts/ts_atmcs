@@ -21,5 +21,4 @@ import asyncio
 
 from lsst.ts import ATMCSSimulator
 
-csc = ATMCSSimulator.ATMCSCsc.main(index=0)
-asyncio.get_event_loop().run_until_complete(csc.done_task)
+asyncio.run(ATMCSSimulator.ATMCSCsc.amain(index=None))
