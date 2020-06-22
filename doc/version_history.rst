@@ -6,6 +6,22 @@
 Version History
 ###############
 
+v1.0.4
+======
+
+Changes:
+
+* Update deprecated code for compatibility with ts_salobj 6 (and 5).
+* Add black to conda test dependencies
+
+Requires:
+
+* ts_salobj 5.11 or 6
+* ts_simactuators 1 or 2
+* ts_idl 1
+* ts_xml 4.9 - 6
+* IDL file for ATMCS, e.g. built with make_idl_files.py
+
 v1.0.3
 ======
 

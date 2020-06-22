@@ -28,7 +28,7 @@ from lsst.ts import simactuators
 from lsst.ts import ATMCSSimulator
 from lsst.ts.idl.enums.ATMCS import AtMountState, M3ExitPort, M3State
 
-STD_TIMEOUT = 5  # standard timeout, seconds
+STD_TIMEOUT = 10  # standard timeout, seconds
 
 
 class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
@@ -105,6 +105,7 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
                     "target",  # output by trackTarget
                     "summaryState",  # already read
                     "softwareVersions",  # not yet supported by salobj
+                    "authList",  # only present for SAL 4.2 and later
                     "appliedSettingsMatchStart",
                     "detailedState",
                     "errorCode",
