@@ -78,6 +78,8 @@ class ATMCSCsc(salobj.BaseCsc):
       * Otherwise neither switch is active
     """
 
+    valid_simulation_modes = [1]
+
     def __init__(self, initial_state=salobj.State.STANDBY):
         super().__init__(
             name="ATMCS", index=0, initial_state=initial_state, simulation_mode=1
@@ -508,12 +510,6 @@ class ATMCSCsc(salobj.BaseCsc):
         """
         await asyncio.sleep(0)
         self.update_events()
-
-    async def implement_simulation_mode(self, simulation_mode):
-        if simulation_mode != 1:
-            raise salobj.ExpectedError(
-                f"This CSC only supports simulation; simulation_mode={simulation_mode} but must be 1"
-            )
 
     def m3_port_rot(self, tai):
         """Return exit port and rotator axis.
