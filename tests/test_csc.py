@@ -325,13 +325,24 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
             )
 
     async def test_set_instrument_port(self):
-        async with self.make_csc(initial_state=salobj.State.ENABLED):
+        async with self.make_csc(initial_state=salobj.State.STANDBY):
+            # Change states manually to make the test compatible
+            # with both ts_salobj 6.0 and 6.1: 6.0 does not output
+            # evt_nasmyth1DriveStatus with enable=False
+            # if initial_state=salobj.State.ENABLE).
+            # Once we are not longer using salobj 6, it is safe to
+            # remove the following line and specify
+            # ``initial_state=salobj.State.ENABLED`` above
+            await salobj.set_summary_state(self.remote, state=salobj.State.ENABLED)
             self.csc.configure(
                 max_velocity=(100,) * 5, max_acceleration=(200,) * 5,
             )
 
             await self.assert_next_sample(
                 self.remote.evt_m3State, state=M3State.NASMYTH1
+            )
+            await self.assert_next_sample(
+                self.remote.evt_nasmyth1DriveStatus, enable=False
             )
             await self.assert_next_sample(
                 self.remote.evt_nasmyth1DriveStatus, enable=True
