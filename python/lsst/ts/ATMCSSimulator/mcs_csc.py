@@ -580,9 +580,14 @@ class ATMCSCsc(salobj.BaseCsc):
             Event name (without the ``evt_`` prefix)
         **kwargs : `dict`
             Data for ``ControllerEvent.set``
+
+        Returns
+        -------
+        did_put : `bool`
+            True if the data was output, False otherwise
         """
         evt = getattr(self, f"evt_{evt_name}")
-        evt.set_put(**kwargs)
+        return evt.set_put(**kwargs)
 
     def update_events(self):
         """Update most events and output those that have changed.
