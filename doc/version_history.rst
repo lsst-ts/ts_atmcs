@@ -6,6 +6,24 @@
 Version History
 ###############
 
+v1.1.0
+======
+
+Changes:
+
+* Updated for ts_salobj 6.1.
+* Updated `ATMCSCsc.set_event` to return ``did_put``, for debugging.
+* Defined `ATMCSCsc` class variable ``valid_simulation_modes`` to eliminate a deprecation warning.
+* Remove deprecation warnings caused by calling `salobj.RemoteTopic.get` with ``flush`` specified.
+
+Requires:
+
+* ts_salobj 6
+* ts_simactuators 2
+* ts_idl 2
+* ts_xml 5 - 6
+* IDL file for ATMCS, e.g. built with make_idl_files.py
+
 v1.0.4
 ======
 
@@ -16,10 +34,10 @@ Changes:
 
 Requires:
 
-* ts_salobj 5.11 or 6
+* ts_salobj 5.11 or 6.0
 * ts_simactuators 1 or 2
-* ts_idl 1
-* ts_xml 4.9 - 6
+* ts_idl 1 (for ts_salobj 5) or 2 (for ts_salobj 6)
+* ts_xml 5 - 6
 * IDL file for ATMCS, e.g. built with make_idl_files.py
 
 v1.0.3
@@ -34,7 +52,7 @@ Requires:
 * ts_salobj 5.11
 * ts_simactuators 1.0
 * ts_idl 1
-* ts_xml 4.9
+* ts_xml 5
 * IDL file for ATMCS, e.g. built with make_idl_files.py
 
 v1.0.2
@@ -53,7 +71,7 @@ Requires:
 * ts_salobj 5.11
 * ts_simactuators 1.0
 * ts_idl 1
-* ts_xml 4.9
+* ts_xml 5
 * IDL file for ATMCS, e.g. built with make_idl_files.py
 
 v1.0.1
@@ -70,7 +88,7 @@ Requires:
 * ts_salobj 5.4
 * ts_simactuators 1.0
 * ts_idl 1
-* ts_xml 4.9
+* ts_xml 5
 * IDL file for ATMCS, e.g. built with make_idl_files.py
 
 v1.0.0
@@ -83,7 +101,7 @@ Requires:
 * ts_salobj 5.4
 * ts_simactuators 1.0
 * ts_idl 1
-* ts_xml 4.9
+* ts_xml 5
 * IDL file for ATMCS, e.g. built with make_idl_files.py
 
 v0.11.0
@@ -101,7 +119,7 @@ Requires:
 * ts_salobj 5.4
 * ts_simactuators 0.1
 * ts_idl 1
-* ts_xml 4.9
+* ts_xml 5
 * IDL file for ATMCS, e.g. built with make_idl_files.py
 
 v0.10.1
