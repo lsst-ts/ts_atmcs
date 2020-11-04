@@ -325,13 +325,24 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
             )
 
     async def test_set_instrument_port(self):
-        async with self.make_csc(initial_state=salobj.State.ENABLED):
+        async with self.make_csc(initial_state=salobj.State.STANDBY):
+            # Change states manually to make the test compatible
+            # with both ts_salobj 6.0 and 6.1: 6.0 does not output
+            # evt_nasmyth1DriveStatus with enable=False
+            # if initial_state=salobj.State.ENABLE).
+            # Once we are not longer using salobj 6, it is safe to
+            # remove the following line and specify
+            # ``initial_state=salobj.State.ENABLED`` above
+            await salobj.set_summary_state(self.remote, state=salobj.State.ENABLED)
             self.csc.configure(
                 max_velocity=(100,) * 5, max_acceleration=(200,) * 5,
             )
 
             await self.assert_next_sample(
                 self.remote.evt_m3State, state=M3State.NASMYTH1
+            )
+            await self.assert_next_sample(
+                self.remote.evt_nasmyth1DriveStatus, enable=False
             )
             await self.assert_next_sample(
                 self.remote.evt_nasmyth1DriveStatus, enable=True
@@ -355,7 +366,7 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
             await self.assert_next_sample(
                 self.remote.evt_nasmyth1DriveStatus, enable=False
             )
-            data = self.remote.evt_nasmyth2DriveStatus.get(flush=True)
+            data = self.remote.evt_nasmyth2DriveStatus.get()
             self.assertFalse(data.enable)
 
             start_tai = salobj.current_tai()
@@ -376,9 +387,9 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
             )
             dt = salobj.current_tai() - start_tai
             print(f"test_set_instrument_port M3 rotation took {dt:0.2f} sec")
-            data = self.remote.evt_nasmyth1DriveStatus.get(flush=True)
+            data = self.remote.evt_nasmyth1DriveStatus.get()
             self.assertFalse(data.enable)
-            data = self.remote.evt_nasmyth2DriveStatus.get(flush=True)
+            data = self.remote.evt_nasmyth2DriveStatus.get()
             self.assertFalse(data.enable)
 
             await self.remote.cmd_setInstrumentPort.set_start(
@@ -394,10 +405,11 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
             )
 
             # Both rotators should remain disabled.
-            data = self.remote.evt_nasmyth1DriveStatus.get(flush=True)
+            data = self.remote.evt_nasmyth1DriveStatus.get()
             self.assertFalse(data.enable)
-            data = self.remote.evt_nasmyth2DriveStatus.get(flush=True)
+            data = self.remote.evt_nasmyth2DriveStatus.get()
             self.assertFalse(data.enable)
+            self.remote.evt_nasmyth2DriveStatus.flush()
 
             await self.assert_next_sample(
                 self.remote.evt_m3State, state=M3State.NASMYTH2, timeout=5
