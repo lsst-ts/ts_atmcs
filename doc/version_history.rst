@@ -15,6 +15,7 @@ Changes:
 * Updated `ATMCSCsc.set_event` to return ``did_put``, for debugging.
 * Defined `ATMCSCsc` class variable ``valid_simulation_modes`` to eliminate a deprecation warning.
 * Remove deprecation warnings caused by calling `salobj.RemoteTopic.get` with ``flush`` specified.
+* Removed obsolete travis file.
 
 Requires:
 

@@ -43,7 +43,6 @@ Python API reference
 
 .. automodapi:: lsst.ts.ATMCSSimulator
    :no-main-docstr:
-   :no-inheritance-diagram:
 
 Version History
 ===============
