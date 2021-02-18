@@ -29,6 +29,7 @@ import numpy as np
 from lsst.ts import salobj
 from lsst.ts import simactuators
 from lsst.ts.idl.enums.ATMCS import AtMountState, M3ExitPort, M3State
+from . import __version__
 
 
 class Axis(enum.IntEnum):
@@ -79,6 +80,7 @@ class ATMCSCsc(salobj.BaseCsc):
     """
 
     valid_simulation_modes = [1]
+    version = __version__ + " sim"
 
     def __init__(self, initial_state=salobj.State.STANDBY):
         super().__init__(

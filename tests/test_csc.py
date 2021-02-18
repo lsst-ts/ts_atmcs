@@ -96,8 +96,12 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
         except the m3PortSelected event
         """
         async with self.make_csc(initial_state=salobj.State.ENABLED):
-            state = await self.remote.evt_summaryState.next(flush=False, timeout=5)
-            self.assertEqual(state.summaryState, salobj.State.ENABLED)
+            await self.assert_next_summary_state(salobj.State.ENABLED)
+            await self.assert_next_sample(
+                topic=self.remote.evt_softwareVersions,
+                cscVersion=ATMCSSimulator.__version__ + " sim",
+                subsystemVersions="",
+            )
 
             for event_name in self.csc.salinfo.event_names:
                 if event_name in (
@@ -568,8 +572,6 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
         """Call stopTracking while tracking, before a slew is done.
         """
         async with self.make_csc(initial_state=salobj.State.ENABLED):
-            state = await self.remote.evt_summaryState.next(flush=False, timeout=5)
-            self.assertEqual(state.summaryState, salobj.State.ENABLED)
             await self.assert_next_sample(
                 self.remote.evt_atMountState, state=AtMountState.TRACKINGDISABLED
             )
