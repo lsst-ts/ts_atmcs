@@ -466,7 +466,7 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
             start_tai = salobj.current_tai()
             path_dict = dict(
                 elevation=simactuators.path.PathSegment(
-                    tai=start_tai, position=6, velocity=0.001
+                    tai=start_tai, position=75, velocity=0.001
                 ),
                 azimuth=simactuators.path.PathSegment(
                     tai=start_tai, position=5, velocity=-0.001
