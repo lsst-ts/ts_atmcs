@@ -134,7 +134,10 @@ class ATMCSCsc(salobj.BaseCsc):
         # Name of drive status events for each axis.
         self._drive_status_names = (
             ("elevationDriveStatus",),
-            ("azimuthDrive1Status", "azimuthDrive2Status",),
+            (
+                "azimuthDrive1Status",
+                "azimuthDrive2Status",
+            ),
             ("nasmyth1DriveStatus",),
             ("nasmyth2DriveStatus",),
             ("m3DriveStatus",),
@@ -142,7 +145,10 @@ class ATMCSCsc(salobj.BaseCsc):
         # Name of brake events for each axis.
         self._brake_names = (
             ("elevationBrake",),
-            ("azimuthBrake1", "azimuthBrake2",),
+            (
+                "azimuthBrake1",
+                "azimuthBrake2",
+            ),
             ("nasmyth1Brake",),
             ("nasmyth2Brake",),
             (),
@@ -500,8 +506,7 @@ class ATMCSCsc(salobj.BaseCsc):
         )
 
     def disable_all_drives(self):
-        """Stop all drives, disable them and put on brakes.
-        """
+        """Stop all drives, disable them and put on brakes."""
         self._tracking_enabled = False
         already_stopped = True
         tai = salobj.current_tai()
@@ -520,8 +525,7 @@ class ATMCSCsc(salobj.BaseCsc):
         self.update_events()
 
     async def _finish_disable_all_drives(self):
-        """Wait for the main axes to stop.
-        """
+        """Wait for the main axes to stop."""
         end_times = [actuator.path[-1].tai for actuator in self.actuators]
         max_end_time = max(end_times)
         # give a bit of margin to be sure the axes are stopped
@@ -533,8 +537,7 @@ class ATMCSCsc(salobj.BaseCsc):
         asyncio.ensure_future(self._run_update_events())
 
     async def _finish_stop_tracking(self):
-        """Wait for the main axes to stop.
-        """
+        """Wait for the main axes to stop."""
         end_times = [self.actuators[axis].path[-1].tai for axis in MainAxes]
         max_end_time = max(end_times)
         dt = 0.1 + max_end_time - salobj.current_tai()
@@ -840,8 +843,7 @@ class ATMCSCsc(salobj.BaseCsc):
             raise
 
     def update_telemetry(self):
-        """Output all telemetry topics.
-        """
+        """Output all telemetry topics."""
         try:
             nitems = len(self.tel_mount_AzEl_Encoders.data.elevationEncoder1Raw)
             curr_time = salobj.current_tai()
