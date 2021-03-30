@@ -21,8 +21,6 @@
 import asyncio
 import unittest
 
-import asynctest
-
 from lsst.ts import salobj
 from lsst.ts import simactuators
 from lsst.ts import ATMCSSimulator
@@ -31,7 +29,7 @@ from lsst.ts.idl.enums.ATMCS import AtMountState, M3ExitPort, M3State
 STD_TIMEOUT = 10  # standard timeout, seconds
 
 
-class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
+class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.axis_names = (  # names of axes for trackTarget command
             "elevation",
