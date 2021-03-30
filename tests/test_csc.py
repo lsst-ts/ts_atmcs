@@ -21,8 +21,6 @@
 import asyncio
 import unittest
 
-import asynctest
-
 from lsst.ts import salobj
 from lsst.ts import simactuators
 from lsst.ts import ATMCSSimulator
@@ -31,7 +29,7 @@ from lsst.ts.idl.enums.ATMCS import AtMountState, M3ExitPort, M3State
 STD_TIMEOUT = 10  # standard timeout, seconds
 
 
-class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
+class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.axis_names = (  # names of axes for trackTarget command
             "elevation",
@@ -130,8 +128,7 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
                 timeout = 0.1
 
     async def test_invalid_track_target(self):
-        """Test all reasons trackTarget may be rejected.
-        """
+        """Test all reasons trackTarget may be rejected."""
         async with self.make_csc(initial_state=salobj.State.ENABLED):
             # Get the initial summary state, so `fault_to_enabled` sees FAULT.
             await self.assert_next_summary_state(salobj.State.ENABLED)
@@ -339,7 +336,8 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
             # ``initial_state=salobj.State.ENABLED`` above
             await salobj.set_summary_state(self.remote, state=salobj.State.ENABLED)
             self.csc.configure(
-                max_velocity=(100,) * 5, max_acceleration=(200,) * 5,
+                max_velocity=(100,) * 5,
+                max_acceleration=(200,) * 5,
             )
 
             await self.assert_next_sample(
@@ -437,7 +435,8 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
     async def test_track(self):
         async with self.make_csc(initial_state=salobj.State.ENABLED):
             self.csc.configure(
-                max_velocity=(100,) * 5, max_acceleration=(200,) * 5,
+                max_velocity=(100,) * 5,
+                max_acceleration=(200,) * 5,
             )
 
             await self.assert_next_sample(
@@ -569,8 +568,7 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
             )
 
     async def test_stop_tracking_while_slewing(self):
-        """Call stopTracking while tracking, before a slew is done.
-        """
+        """Call stopTracking while tracking, before a slew is done."""
         async with self.make_csc(initial_state=salobj.State.ENABLED):
             await self.assert_next_sample(
                 self.remote.evt_atMountState, state=AtMountState.TRACKINGDISABLED
@@ -622,8 +620,7 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
                 self.assertEqual(actuator.kind(), actuator.Kind.Stopped)
 
     async def test_disable_while_slewing(self):
-        """Call disable while tracking, before a slew is done.
-        """
+        """Call disable while tracking, before a slew is done."""
         async with self.make_csc(initial_state=salobj.State.ENABLED):
             state = await self.remote.evt_summaryState.next(flush=False, timeout=5)
             self.assertEqual(state.summaryState, salobj.State.ENABLED)

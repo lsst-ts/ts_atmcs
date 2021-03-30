@@ -6,6 +6,24 @@
 Version History
 ###############
 
+v1.1.3
+======
+
+Changes:
+
+* Use `unittest.IsolatedAsyncioTestCase` instead of the abandoned asynctest package.
+* Use pre-commit instead of a custom pre-commit hook; see the README.md for instructions.
+* Format the code with black 20.8b1.
+
+Requires:
+
+* ts_salobj 6
+* ts_simactuators 2
+* ts_idl 2
+* ts_xml 5 - 6
+* IDL file for ATMCS, e.g. built with make_idl_files.py
+* Modernize ``doc/conf.py`` for documenteer 0.6.
+
 v1.1.2
 ======
 
