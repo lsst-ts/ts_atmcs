@@ -6,11 +6,56 @@
 Version History
 ###############
 
+v1.1.3
+======
+
+Changes:
+
+* Use `unittest.IsolatedAsyncioTestCase` instead of the abandoned asynctest package.
+* Use pre-commit instead of a custom pre-commit hook; see the README.md for instructions.
+* Format the code with black 20.8b1.
+
+Requires:
+
+* ts_salobj 6
+* ts_simactuators 2
+* ts_idl 2
+* ts_xml 5 - 6
+* IDL file for ATMCS, e.g. built with make_idl_files.py
+* Modernize ``doc/conf.py`` for documenteer 0.6.
+
+v1.1.2
+======
+
+Changes:
+
+* `ATMCSCsc`: set class variable ``version`` to the package version + " sim", to differentiate between this and the real ATMCS CSC.
+  Test that this properly sets the ``cscVersion`` field of the ``softwareVersions`` event.
+* Make the initial position easily configurable.
+* Make the initial elevation more realistic (the other actuators were fine).
+
+Requires:
+
+* ts_salobj 6
+* ts_simactuators 2
+* ts_idl 2
+* ts_xml 5 - 6
+* IDL file for ATMCS, e.g. built with make_idl_files.py
+* Modernize ``doc/conf.py`` for documenteer 0.6.
+
 v1.1.1
 ======
 
 * Updated Jenkinsfile.conda to Jenkins Shared Library
 * Pinned the version of ts-idl and ts-salobj in conda recipe
+
+Requires:
+
+* ts_salobj 6
+* ts_simactuators 2
+* ts_idl 2
+* ts_xml 5 - 6
+* IDL file for ATMCS, e.g. built with make_idl_files.py
 
 v1.1.0
 ======

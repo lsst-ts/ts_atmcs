@@ -28,6 +28,8 @@ With the package built and set up you can run the simulator using:
 
     run_atmcs_simulator.py
 
+If you want a different configuration, you can call `ATMCSCsc.configure` (from Python, not SAL).
+
 .. _lsst.ts.ATMCSSimulator-contributing:
 
 Contributing
