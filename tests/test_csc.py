@@ -114,6 +114,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                     "logMessage",
                     "settingVersions",
                     "settingsApplied",  # not yet supported by salobj
+                    "largeFileObjectAvailable",  # not supported by CSC
                 ):
                     continue
                 with self.subTest(event_name=event_name):
