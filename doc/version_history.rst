@@ -6,6 +6,24 @@
 Version History
 ###############
 
+v1.1.4
+======
+
+Changes:
+
+* Update `test_initial_info` in `test_csc` to ignore `largeFileObjectAvailable` new generic event (ts_xml >10).
+* Update calls to methods that moved from `lsst.ts.salobj` to `lsst.ts.utils`.
+
+Requires:
+
+* ts_salobj >=6
+* ts_utils >=1
+* ts_simactuators 2
+* ts_idl >=2
+* ts_xml >=5
+* IDL file for ATMCS, e.g. built with make_idl_files.py
+* Modernize ``doc/conf.py`` for documenteer 0.6.
+
 v1.1.3
 ======
 

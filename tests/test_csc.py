@@ -21,6 +21,7 @@
 import asyncio
 import unittest
 
+from lsst.ts import utils
 from lsst.ts import salobj
 from lsst.ts import simactuators
 from lsst.ts import ATMCSSimulator
@@ -114,6 +115,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                     "logMessage",
                     "settingVersions",
                     "settingsApplied",  # not yet supported by salobj
+                    "largeFileObjectAvailable",  # not supported by CSC
                 ):
                     continue
                 with self.subTest(event_name=event_name):
@@ -157,7 +159,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             # Cannot send trackTarget while tracking disabled;
             # this error does not change the summary state.
             self.remote.cmd_trackTarget.set(
-                taiTime=salobj.current_tai(), **good_target_kwargs
+                taiTime=utils.current_tai(), **good_target_kwargs
             )
             with salobj.assertRaisesAckError():
                 await self.remote.cmd_trackTarget.start(timeout=1)
@@ -198,7 +200,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                         min_commanded_position[axis] - 0.000001
                     )
                     self.remote.cmd_trackTarget.set(
-                        taiTime=salobj.current_tai(), **min_position_kwargs
+                        taiTime=utils.current_tai(), **min_position_kwargs
                     )
                     with salobj.assertRaisesAckError():
                         await self.remote.cmd_trackTarget.start(timeout=1)
@@ -218,7 +220,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                         max_commanded_position[axis] + 0.000001
                     )
                     self.remote.cmd_trackTarget.set(
-                        taiTime=salobj.current_tai(), **max_position_kwargs
+                        taiTime=utils.current_tai(), **max_position_kwargs
                     )
                     with salobj.assertRaisesAckError():
                         await self.remote.cmd_trackTarget.start(timeout=1)
@@ -238,7 +240,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                         max_velocity[axis] + 0.000001
                     )
                     self.remote.cmd_trackTarget.set(
-                        taiTime=salobj.current_tai(), **max_velocity_kwargs
+                        taiTime=utils.current_tai(), **max_velocity_kwargs
                     )
                     with salobj.assertRaisesAckError():
                         await self.remote.cmd_trackTarget.start(timeout=1)
@@ -259,7 +261,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             way_out_kwargs["elevation"] = 85
             way_out_kwargs["elevationVelocity"] = -2
             self.remote.cmd_trackTarget.set(
-                taiTime=salobj.current_tai() + 10, **way_out_kwargs
+                taiTime=utils.current_tai() + 10, **way_out_kwargs
             )
             with salobj.assertRaisesAckError():
                 await self.remote.cmd_trackTarget.start(timeout=1)
@@ -371,7 +373,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             data = self.remote.evt_nasmyth2DriveStatus.get()
             self.assertFalse(data.enable)
 
-            start_tai = salobj.current_tai()
+            start_tai = utils.current_tai()
 
             await asyncio.sleep(0.2)
 
@@ -380,14 +382,14 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 await self.remote.cmd_startTracking.start()
 
             actuator = self.csc.actuators[ATMCSSimulator.Axis.M3]
-            curr_segment = actuator.path.at(salobj.current_tai())
+            curr_segment = actuator.path.at(utils.current_tai())
             self.assertNotEqual(curr_segment.velocity, 0)
 
             # M3 is pointing to Port 3; neither rotator should be enabled.
             await self.assert_next_sample(
                 self.remote.evt_m3State, state=M3State.PORT3, timeout=5
             )
-            dt = salobj.current_tai() - start_tai
+            dt = utils.current_tai() - start_tai
             print(f"test_set_instrument_port M3 rotation took {dt:0.2f} sec")
             data = self.remote.evt_nasmyth1DriveStatus.get()
             self.assertFalse(data.enable)
@@ -398,7 +400,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 port=M3ExitPort.NASMYTH2, timeout=STD_TIMEOUT
             )
 
-            start_tai = salobj.current_tai()
+            start_tai = utils.current_tai()
             await self.assert_next_sample(
                 self.remote.evt_m3PortSelected, selected=M3ExitPort.NASMYTH2
             )
@@ -416,7 +418,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await self.assert_next_sample(
                 self.remote.evt_m3State, state=M3State.NASMYTH2, timeout=5
             )
-            dt = salobj.current_tai() - start_tai
+            dt = utils.current_tai() - start_tai
             print(f"test_set_instrument_port M3 rotation took {dt:0.2f} sec")
 
             # M3 is pointing to Nasmyth2; that rotator
@@ -466,7 +468,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 self.remote.cmd_setInstrumentPort.set(port=1)
                 await self.remote.cmd_setInstrumentPort.start()
 
-            start_tai = salobj.current_tai()
+            start_tai = utils.current_tai()
             path_dict = dict(
                 elevation=simactuators.path.PathSegment(
                     tai=start_tai, position=75, velocity=0.001
@@ -480,7 +482,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
             trackId = 20  # arbitary
             while True:
-                tai = salobj.current_tai() + 0.1  # offset is arbitrary but reasonable
+                tai = utils.current_tai() + 0.1  # offset is arbitrary but reasonable
                 target_kwargs = self.compute_track_target_kwargs(
                     tai=tai, path_dict=path_dict, trackId=trackId
                 )
@@ -493,12 +495,12 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 if data.inPosition:
                     break
 
-                if salobj.current_tai() - start_tai > 5:
+                if utils.current_tai() - start_tai > 5:
                     raise self.fail("Timed out waiting for slew to finish")
 
                 await asyncio.sleep(0.5)
 
-            print(f"test_track slew took {salobj.current_tai() - start_tai:0.2f} sec")
+            print(f"test_track slew took {utils.current_tai() - start_tai:0.2f} sec")
 
             with self.assertRaises(asyncio.TimeoutError):
                 await self.remote.evt_target.next(flush=False, timeout=0.1)
@@ -553,7 +555,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
 
             await self.remote.cmd_trackTarget.set_start(
-                elevation=10, taiTime=salobj.current_tai(), trackId=20, timeout=1
+                elevation=10, taiTime=utils.current_tai(), trackId=20, timeout=1
             )
 
             # wait too long for trackTarget
@@ -583,7 +585,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 self.remote.evt_atMountState, state=AtMountState.TRACKINGENABLED
             )
 
-            start_tai = salobj.current_tai()
+            start_tai = utils.current_tai()
             path_dict = dict(
                 elevation=simactuators.path.PathSegment(tai=start_tai, position=45),
                 azimuth=simactuators.path.PathSegment(tai=start_tai, position=100),
@@ -633,7 +635,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 self.remote.evt_atMountState, state=AtMountState.TRACKINGENABLED
             )
 
-            start_tai = salobj.current_tai()
+            start_tai = utils.current_tai()
             path_dict = dict(
                 elevation=simactuators.path.PathSegment(tai=start_tai, position=45),
                 azimuth=simactuators.path.PathSegment(tai=start_tai, position=100),

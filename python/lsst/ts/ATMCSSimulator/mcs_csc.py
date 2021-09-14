@@ -26,6 +26,7 @@ import enum
 
 import numpy as np
 
+from lsst.ts import utils
 from lsst.ts import salobj
 from lsst.ts import simactuators
 from lsst.ts.idl.enums.ATMCS import AtMountState, M3ExitPort, M3State
@@ -91,11 +92,11 @@ class ATMCSCsc(salobj.BaseCsc):
         # number of event updates per telemetry update
         self._events_per_telemetry = 10
         # task that runs while the events_and_telemetry_loop runs
-        self._events_and_telemetry_task = salobj.make_done_future()
+        self._events_and_telemetry_task = utils.make_done_future()
         # task that runs while axes are slewing to a halt from stopTracking
-        self._stop_tracking_task = salobj.make_done_future()
+        self._stop_tracking_task = utils.make_done_future()
         # task that runs while axes are halting before being disabled
-        self._disable_all_drives_task = salobj.make_done_future()
+        self._disable_all_drives_task = utils.make_done_future()
         # Dict of M3ExitPort (the instrument port M3 points to): tuple of:
         # * index of self.m3_port_positions: the M3 position for this port
         # * M3State (state of M3 axis when pointing to this port)
@@ -166,7 +167,7 @@ class ATMCSCsc(salobj.BaseCsc):
         # if the axis is disabled/enabled, respectively.
         self._axis_enabled = np.zeros([5], dtype=bool)
         # Timer to kill tracking if trackTarget doesn't arrive in time.
-        self._kill_tracking_timer = salobj.make_done_future()
+        self._kill_tracking_timer = utils.make_done_future()
 
         self.configure()
         # note: initial events are output by handle_summary_state
@@ -335,7 +336,7 @@ class ATMCSCsc(salobj.BaseCsc):
         self.m3tolerance = 1e-5
         self.limit_overtravel = limit_overtravel
 
-        tai = salobj.current_tai()
+        tai = utils.current_tai()
         self.actuators = [
             simactuators.TrackingActuator(
                 min_position=self.min_commanded_position[axis],
@@ -393,7 +394,7 @@ class ATMCSCsc(salobj.BaseCsc):
                 ],
                 dtype=float,
             )
-            dt = salobj.current_tai() - data.taiTime
+            dt = utils.current_tai() - data.taiTime
             current_position = position + dt * velocity
             if np.any(current_position < self.min_commanded_position[0:4]) or np.any(
                 current_position > self.max_commanded_position[0:4]
@@ -476,7 +477,7 @@ class ATMCSCsc(salobj.BaseCsc):
             # already there; don't do anything
             return
         self.actuators[Axis.M3].set_target(
-            tai=salobj.current_tai(), position=m3_port_positions, velocity=0
+            tai=utils.current_tai(), position=m3_port_positions, velocity=0
         )
         self._axis_enabled[Axis.NA1] = False
         self._axis_enabled[Axis.NA2] = False
@@ -509,7 +510,7 @@ class ATMCSCsc(salobj.BaseCsc):
         """Stop all drives, disable them and put on brakes."""
         self._tracking_enabled = False
         already_stopped = True
-        tai = salobj.current_tai()
+        tai = utils.current_tai()
         for axis in Axis:
             actuator = self.actuators[axis]
             if actuator.kind(tai) == actuator.Kind.Stopped:
@@ -529,7 +530,7 @@ class ATMCSCsc(salobj.BaseCsc):
         end_times = [actuator.path[-1].tai for actuator in self.actuators]
         max_end_time = max(end_times)
         # give a bit of margin to be sure the axes are stopped
-        dt = 0.1 + max_end_time - salobj.current_tai()
+        dt = 0.1 + max_end_time - utils.current_tai()
         if dt > 0:
             await asyncio.sleep(dt)
         for axis in Axis:
@@ -540,7 +541,7 @@ class ATMCSCsc(salobj.BaseCsc):
         """Wait for the main axes to stop."""
         end_times = [self.actuators[axis].path[-1].tai for axis in MainAxes]
         max_end_time = max(end_times)
-        dt = 0.1 + max_end_time - salobj.current_tai()
+        dt = 0.1 + max_end_time - utils.current_tai()
         if dt > 0:
             await asyncio.sleep(dt)
         asyncio.ensure_future(self._run_update_events())
@@ -598,7 +599,7 @@ class ATMCSCsc(salobj.BaseCsc):
     async def handle_summary_state(self):
         if self.summary_state == salobj.State.ENABLED:
             axes_to_enable = set((Axis.Elevation, Axis.Azimuth))
-            tai = salobj.current_tai()
+            tai = utils.current_tai()
             rot_axis = self.m3_port_rot(tai)[1]
             if rot_axis is not None:
                 axes_to_enable.add(rot_axis)
@@ -683,7 +684,7 @@ class ATMCSCsc(salobj.BaseCsc):
         disable its drives and set its brakes.
         """
         try:
-            tai = salobj.current_tai()
+            tai = utils.current_tai()
             current_position = np.array(
                 [actuator.path.at(tai).position for actuator in self.actuators],
                 dtype=float,
@@ -846,7 +847,7 @@ class ATMCSCsc(salobj.BaseCsc):
         """Output all telemetry topics."""
         try:
             nitems = len(self.tel_mount_AzEl_Encoders.data.elevationEncoder1Raw)
-            curr_time = salobj.current_tai()
+            curr_time = utils.current_tai()
 
             times = np.linspace(
                 start=curr_time - self._telemetry_interval,
