@@ -6,13 +6,32 @@
 Version History
 ###############
 
+v1.2.0
+------
+
+Changes:
+
+* Update for ts_salobj v7, which is required.
+  This also requires ts_xml 11.
+* Use ts_utils and pytest-black.
+* Modernize unit tests to use bare assert.
+
+Requires:
+
+* ts_salobj 7
+* ts_utils 1
+* ts_simactuators 2
+* ts_idl 2
+* IDL file for ATMCS built from ts_xml 11
+
 v1.1.4
-======
+------
 
 Changes:
 
 * Update `test_initial_info` in `test_csc` to ignore `largeFileObjectAvailable` new generic event (ts_xml >10).
 * Update calls to methods that moved from `lsst.ts.salobj` to `lsst.ts.utils`.
+* Modernize ``doc/conf.py`` for documenteer 0.6.
 
 Requires:
 
@@ -22,10 +41,9 @@ Requires:
 * ts_idl >=2
 * ts_xml >=5
 * IDL file for ATMCS, e.g. built with make_idl_files.py
-* Modernize ``doc/conf.py`` for documenteer 0.6.
 
 v1.1.3
-======
+------
 
 Changes:
 
@@ -43,7 +61,7 @@ Requires:
 * Modernize ``doc/conf.py`` for documenteer 0.6.
 
 v1.1.2
-======
+------
 
 Changes:
 
@@ -62,7 +80,7 @@ Requires:
 * Modernize ``doc/conf.py`` for documenteer 0.6.
 
 v1.1.1
-======
+------
 
 * Updated Jenkinsfile.conda to Jenkins Shared Library
 * Pinned the version of ts-idl and ts-salobj in conda recipe
@@ -76,7 +94,7 @@ Requires:
 * IDL file for ATMCS, e.g. built with make_idl_files.py
 
 v1.1.0
-======
+------
 
 Changes:
 
@@ -95,7 +113,7 @@ Requires:
 * IDL file for ATMCS, e.g. built with make_idl_files.py
 
 v1.0.4
-======
+------
 
 Changes:
 
@@ -111,7 +129,7 @@ Requires:
 * IDL file for ATMCS, e.g. built with make_idl_files.py
 
 v1.0.3
-======
+------
 
 Changes:
 
@@ -126,7 +144,7 @@ Requires:
 * IDL file for ATMCS, e.g. built with make_idl_files.py
 
 v1.0.2
-======
+------
 
 Changes:
 
@@ -145,7 +163,7 @@ Requires:
 * IDL file for ATMCS, e.g. built with make_idl_files.py
 
 v1.0.1
-======
+------
 
 Changes:
 
@@ -162,7 +180,7 @@ Requires:
 * IDL file for ATMCS, e.g. built with make_idl_files.py
 
 v1.0.0
-=======
+------=
 
 First release. No changes from v0.11.0.
 
@@ -175,7 +193,7 @@ Requires:
 * IDL file for ATMCS, e.g. built with make_idl_files.py
 
 v0.11.0
-=======
+------=
 
 Major changes:
 
@@ -193,7 +211,7 @@ Requires:
 * IDL file for ATMCS, e.g. built with make_idl_files.py
 
 v0.10.1
-=======
+------=
 
 Major changes:
 
@@ -207,7 +225,7 @@ Requires:
 * IDL file for ATMCS, e.g. built with make_idl_files.py
 
 v0.10.0
-=======
+------=
 
 Major changes:
 
@@ -222,7 +240,7 @@ Requires:
 * IDL file for ATMCS, e.g. built with make_idl_files.py
 
 v0.9.0
-======
+------
 
 Major changes:
 
@@ -236,7 +254,7 @@ Requires:
 * IDL file for ATMCS, e.g. built with make_idl_files.py
 
 v0.8.3
-======
+------
 
 Make bin/run_atmcs_simulator.py executable (chmod +x).
 
@@ -246,7 +264,7 @@ Requirements:
 * IDL file for ATMCS, e.g. built with make_idl_files.py
 
 v0.8.2
-======
+------
 
 Major changes:
 
@@ -264,7 +282,7 @@ Requirements:
 * IDL file for ATMCS, e.g. built with make_idl_files.py
 
 v0.8.1
-======
+------
 
 * Make sure M3 moves always display "in motion" state.
 * Fix a unit test broken by a new generic event.
@@ -276,7 +294,7 @@ Requirements:
 * IDL file for ATMCS, e.g. built with make_idl_files.py
 
 v0.8.0
-======
+------
 
 Major changes:
 
@@ -289,7 +307,7 @@ Requirements:
 * IDL file for ATMCS, e.g. built with make_idl_files.py
 
 v0.7.0
-======
+------
 
 Major changes:
 
@@ -304,7 +322,7 @@ Requirements:
 * ATMCS IDL files, e.g. built with make_idl_files.py
 
 v0.6.0
-======
+------
 
 Major changes:
 
