@@ -32,6 +32,7 @@ STD_TIMEOUT = 10  # standard timeout, seconds
 
 class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     def setUp(self):
+        super().setUp()
         self.axis_names = (  # names of axes for trackTarget command
             "elevation",
             "azimuth",
@@ -138,7 +139,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             min_commanded_position = (5, -270, -165, -165, 0)
             max_commanded_position = (90, 270, 165, 165, 180)
             max_velocity = (100,) * 5
-            self.csc.configure(
+            await self.csc.configure(
                 min_commanded_position=min_commanded_position,
                 max_commanded_position=max_commanded_position,
                 max_velocity=max_velocity,
@@ -337,7 +338,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             # remove the following line and specify
             # ``initial_state=salobj.State.ENABLED`` above
             await salobj.set_summary_state(self.remote, state=salobj.State.ENABLED)
-            self.csc.configure(
+            await self.csc.configure(
                 max_velocity=(100,) * 5,
                 max_acceleration=(200,) * 5,
             )
@@ -436,7 +437,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
     async def test_track(self):
         async with self.make_csc(initial_state=salobj.State.ENABLED):
-            self.csc.configure(
+            await self.csc.configure(
                 max_velocity=(100,) * 5,
                 max_acceleration=(200,) * 5,
             )
@@ -521,7 +522,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             # Get the initial summary state, so `fault_to_enabled` sees FAULT.
             await self.assert_next_summary_state(salobj.State.ENABLED)
 
-            self.csc.configure(
+            await self.csc.configure(
                 max_tracking_interval=max_tracking_interval,
                 max_velocity=(100,) * 5,
                 max_acceleration=(200,) * 5,
@@ -543,7 +544,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await self.assert_next_sample(
                 self.remote.evt_atMountState,
                 state=AtMountState.TRACKINGDISABLED,
-                timeout=max_tracking_interval + 0.2,
+                timeout=max_tracking_interval + 1,
             )
             await self.fault_to_enabled()
 
@@ -562,7 +563,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await self.assert_next_sample(
                 self.remote.evt_atMountState,
                 state=AtMountState.STOPPING,
-                timeout=max_tracking_interval + 0.2,
+                timeout=max_tracking_interval + 1,
             )
 
             await self.assert_next_sample(
