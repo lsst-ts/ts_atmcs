@@ -21,6 +21,8 @@
 import asyncio
 import unittest
 
+import pytest
+
 from lsst.ts import utils
 from lsst.ts import salobj
 from lsst.ts import simactuators
@@ -32,6 +34,7 @@ STD_TIMEOUT = 10  # standard timeout, seconds
 
 class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     def setUp(self):
+        super().setUp()
         self.axis_names = (  # names of axes for trackTarget command
             "elevation",
             "azimuth",
@@ -138,7 +141,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             min_commanded_position = (5, -270, -165, -165, 0)
             max_commanded_position = (90, 270, 165, 165, 180)
             max_velocity = (100,) * 5
-            self.csc.configure(
+            await self.csc.configure(
                 min_commanded_position=min_commanded_position,
                 max_commanded_position=max_commanded_position,
                 max_velocity=max_velocity,
@@ -165,7 +168,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 await self.remote.cmd_trackTarget.start(timeout=1)
 
             # The rejected target should not be output as an event.
-            with self.assertRaises(asyncio.TimeoutError):
+            with pytest.raises(asyncio.TimeoutError):
                 await self.remote.evt_target.next(flush=False, timeout=0.1)
 
             # Enable tracking and try again; this time it should work.
@@ -337,7 +340,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             # remove the following line and specify
             # ``initial_state=salobj.State.ENABLED`` above
             await salobj.set_summary_state(self.remote, state=salobj.State.ENABLED)
-            self.csc.configure(
+            await self.csc.configure(
                 max_velocity=(100,) * 5,
                 max_acceleration=(200,) * 5,
             )
@@ -371,7 +374,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 self.remote.evt_nasmyth1DriveStatus, enable=False
             )
             data = self.remote.evt_nasmyth2DriveStatus.get()
-            self.assertFalse(data.enable)
+            assert not (data.enable)
 
             start_tai = utils.current_tai()
 
@@ -383,7 +386,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
             actuator = self.csc.actuators[ATMCSSimulator.Axis.M3]
             curr_segment = actuator.path.at(utils.current_tai())
-            self.assertNotEqual(curr_segment.velocity, 0)
+            assert curr_segment.velocity != 0
 
             # M3 is pointing to Port 3; neither rotator should be enabled.
             await self.assert_next_sample(
@@ -392,9 +395,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             dt = utils.current_tai() - start_tai
             print(f"test_set_instrument_port M3 rotation took {dt:0.2f} sec")
             data = self.remote.evt_nasmyth1DriveStatus.get()
-            self.assertFalse(data.enable)
+            assert not data.enable
             data = self.remote.evt_nasmyth2DriveStatus.get()
-            self.assertFalse(data.enable)
+            assert not data.enable
 
             await self.remote.cmd_setInstrumentPort.set_start(
                 port=M3ExitPort.NASMYTH2, timeout=STD_TIMEOUT
@@ -410,9 +413,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
             # Both rotators should remain disabled.
             data = self.remote.evt_nasmyth1DriveStatus.get()
-            self.assertFalse(data.enable)
+            assert not data.enable
             data = self.remote.evt_nasmyth2DriveStatus.get()
-            self.assertFalse(data.enable)
+            assert not data.enable
             self.remote.evt_nasmyth2DriveStatus.flush()
 
             await self.assert_next_sample(
@@ -427,7 +430,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 self.remote.evt_nasmyth2DriveStatus, enable=True
             )
             data = self.remote.evt_nasmyth1DriveStatus.get()
-            self.assertFalse(data.enable)
+            assert not data.enable
 
     async def test_bin_script(self):
         await self.check_bin_script(
@@ -436,7 +439,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
     async def test_track(self):
         async with self.make_csc(initial_state=salobj.State.ENABLED):
-            self.csc.configure(
+            await self.csc.configure(
                 max_velocity=(100,) * 5,
                 max_acceleration=(200,) * 5,
             )
@@ -502,7 +505,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
             print(f"test_track slew took {utils.current_tai() - start_tai:0.2f} sec")
 
-            with self.assertRaises(asyncio.TimeoutError):
+            with pytest.raises(asyncio.TimeoutError):
                 await self.remote.evt_target.next(flush=False, timeout=0.1)
 
             for event in self.in_position_events:
@@ -521,7 +524,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             # Get the initial summary state, so `fault_to_enabled` sees FAULT.
             await self.assert_next_summary_state(salobj.State.ENABLED)
 
-            self.csc.configure(
+            await self.csc.configure(
                 max_tracking_interval=max_tracking_interval,
                 max_velocity=(100,) * 5,
                 max_acceleration=(200,) * 5,
@@ -543,7 +546,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await self.assert_next_sample(
                 self.remote.evt_atMountState,
                 state=AtMountState.TRACKINGDISABLED,
-                timeout=max_tracking_interval + 0.2,
+                timeout=max_tracking_interval + 1,
             )
             await self.fault_to_enabled()
 
@@ -562,7 +565,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await self.assert_next_sample(
                 self.remote.evt_atMountState,
                 state=AtMountState.STOPPING,
-                timeout=max_tracking_interval + 0.2,
+                timeout=max_tracking_interval + 1,
             )
 
             await self.assert_next_sample(
@@ -619,13 +622,13 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
 
             for actuator in self.csc.actuators:
-                self.assertEqual(actuator.kind(), actuator.Kind.Stopped)
+                assert actuator.kind() == actuator.Kind.Stopped
 
     async def test_disable_while_slewing(self):
         """Call disable while tracking, before a slew is done."""
         async with self.make_csc(initial_state=salobj.State.ENABLED):
             state = await self.remote.evt_summaryState.next(flush=False, timeout=5)
-            self.assertEqual(state.summaryState, salobj.State.ENABLED)
+            assert state.summaryState == salobj.State.ENABLED
             await self.assert_next_sample(
                 self.remote.evt_atMountState, state=AtMountState.TRACKINGDISABLED
             )
@@ -689,7 +692,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             "taiTime",
             "trackId",
         ):
-            self.assertAlmostEqual(getattr(target1, field), getattr(target2, field))
+            assert getattr(target1, field) == pytest.approx(getattr(target2, field))
 
     def compute_track_target_kwargs(self, tai, path_dict, trackId):
         """Compute keyword arguments for the trackTarget command.

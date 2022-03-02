@@ -169,9 +169,6 @@ class ATMCSCsc(salobj.BaseCsc):
         # Timer to kill tracking if trackTarget doesn't arrive in time.
         self._kill_tracking_timer = utils.make_done_future()
 
-        self.configure()
-        # note: initial events are output by handle_summary_state
-
     async def close_tasks(self):
         await super().close_tasks()
         self._disable_all_drives_task.cancel()
@@ -179,7 +176,11 @@ class ATMCSCsc(salobj.BaseCsc):
         self._events_and_telemetry_task.cancel()
         self._kill_tracking_timer.cancel()
 
-    def configure(
+    async def start(self):
+        await self.configure()
+        await super().start()
+
+    async def configure(
         self,
         max_tracking_interval=2.5,
         min_commanded_position=(5, -270, -165, -165, 0),
@@ -353,13 +354,13 @@ class ATMCSCsc(salobj.BaseCsc):
         ]
         self.actuators[0].verbose = True
 
-        self.evt_positionLimits.set_put(
+        await self.evt_positionLimits.set_write(
             minimum=min_commanded_position,
             maximum=max_commanded_position,
             force_output=True,
         )
 
-    def do_startTracking(self, data):
+    async def do_startTracking(self, data):
         self.assert_enabled("startTracking")
         if not self.evt_m3InPosition.data.inPosition:
             raise salobj.ExpectedError(
@@ -368,10 +369,10 @@ class ATMCSCsc(salobj.BaseCsc):
         if not self._stop_tracking_task.done():
             raise salobj.ExpectedError("stopTracking not finished yet")
         self._tracking_enabled = True
-        self.update_events()
+        await self.update_events()
         self._set_tracking_timer(restart=True)
 
-    def do_trackTarget(self, data):
+    async def do_trackTarget(self, data):
         self.assert_enabled("trackTarget")
         if not self._tracking_enabled:
             raise salobj.ExpectedError("Cannot trackTarget until tracking is enabled")
@@ -410,7 +411,7 @@ class ATMCSCsc(salobj.BaseCsc):
                     f"{velocity} > {self.max_velocity}"
                 )
         except Exception as e:
-            self.fault(code=1, report=f"trackTarget failed: {e}")
+            await self.fault(code=1, report=f"trackTarget failed: {e}")
             raise
 
         for i in range(4):
@@ -433,7 +434,7 @@ class ATMCSCsc(salobj.BaseCsc):
             "radesys",
         )
         evt_kwargs = dict((field, getattr(data, field)) for field in target_fields)
-        self.evt_target.set_put(**evt_kwargs, force_output=True)
+        await self.evt_target.set_write(**evt_kwargs, force_output=True)
         self.tel_mount_AzEl_Encoders.set(trackId=data.trackId)
         self.tel_mount_Nasmyth_Encoders.set(trackId=data.trackId)
 
@@ -451,7 +452,7 @@ class ATMCSCsc(salobj.BaseCsc):
         if restart:
             self._kill_tracking_timer = asyncio.ensure_future(self.kill_tracking())
 
-    def do_setInstrumentPort(self, data):
+    async def do_setInstrumentPort(self, data):
         self.assert_enabled("setInstrumentPort")
         if self._tracking_enabled:
             raise salobj.ExpectedError(
@@ -468,7 +469,7 @@ class ATMCSCsc(salobj.BaseCsc):
             raise RuntimeError(
                 f"Bug! invalid m3_port_positions_ind={m3_port_positions_ind} for port={port}"
             )
-        self.evt_m3PortSelected.set_put(selected=port)
+        await self.evt_m3PortSelected.set_write(selected=port)
         m3actuator = self.actuators[Axis.M3]
         if (
             m3actuator.target.position == m3_port_positions
@@ -481,7 +482,7 @@ class ATMCSCsc(salobj.BaseCsc):
         )
         self._axis_enabled[Axis.NA1] = False
         self._axis_enabled[Axis.NA2] = False
-        self.update_events()
+        await self.update_events()
 
     async def do_stopTracking(self, data):
         self.assert_enabled("stopTracking")
@@ -493,7 +494,7 @@ class ATMCSCsc(salobj.BaseCsc):
             self.actuators[axis].stop()
         self._stop_tracking_task.cancel()
         self._stop_tracking_task = asyncio.ensure_future(self._finish_stop_tracking())
-        self.update_events()
+        await self.update_events()
 
     async def kill_tracking(self):
         """Wait ``self.max_tracking_interval`` seconds and disable tracking.
@@ -502,11 +503,11 @@ class ATMCSCsc(salobj.BaseCsc):
         if the next ``trackTarget`` command is not seen quickly enough.
         """
         await asyncio.sleep(self.max_tracking_interval)
-        self.fault(
+        await self.fault(
             code=2, report=f"trackTarget not seen in {self.max_tracking_interval} sec"
         )
 
-    def disable_all_drives(self):
+    async def disable_all_drives(self):
         """Stop all drives, disable them and put on brakes."""
         self._tracking_enabled = False
         already_stopped = True
@@ -523,7 +524,7 @@ class ATMCSCsc(salobj.BaseCsc):
             self._disable_all_drives_task = asyncio.ensure_future(
                 self._finish_disable_all_drives()
             )
-        self.update_events()
+        await self.update_events()
 
     async def _finish_disable_all_drives(self):
         """Wait for the main axes to stop."""
@@ -553,7 +554,7 @@ class ATMCSCsc(salobj.BaseCsc):
         _stop_tracking_task are done.
         """
         await asyncio.sleep(0)
-        self.update_events()
+        await self.update_events()
 
     def m3_port_rot(self, tai):
         """Return exit port and rotator axis.
@@ -606,7 +607,7 @@ class ATMCSCsc(salobj.BaseCsc):
             for axis in Axis:
                 self._axis_enabled[axis] = axis in axes_to_enable
         else:
-            self.disable_all_drives()
+            await self.disable_all_drives()
         if self.summary_state in (salobj.State.DISABLED, salobj.State.ENABLED):
             if self._events_and_telemetry_task.done():
                 self._events_and_telemetry_task = asyncio.ensure_future(
@@ -615,8 +616,9 @@ class ATMCSCsc(salobj.BaseCsc):
         else:
             self._events_and_telemetry_task.cancel()
 
-    def set_event(self, evt_name, **kwargs):
-        """Call ``ControllerEvent.set_put`` for an event specified by name.
+    async def set_write_event(self, evt_name, **kwargs):
+        """Call await ``ControllerEvent.set_write`` for an event
+        specified by name.
 
         Parameters
         ----------
@@ -627,13 +629,13 @@ class ATMCSCsc(salobj.BaseCsc):
 
         Returns
         -------
-        did_put : `bool`
-            True if the data was output, False otherwise
+        result : `salobj.topics.SetWriteResult`
+            Result of the call to set_write.
         """
         evt = getattr(self, f"evt_{evt_name}")
-        return evt.set_put(**kwargs)
+        return await evt.set_write(**kwargs)
 
-    def update_events(self):
+    async def update_events(self):
         """Update most events and output those that have changed.
 
         Notes
@@ -717,12 +719,12 @@ class ATMCSCsc(salobj.BaseCsc):
             # and putting on their brakes (if any)
             abort_axes = []
             for axis in Axis:
-                self.set_event(
+                await self.set_write_event(
                     self._min_lim_names[axis],
                     active=current_position[axis]
                     < self.min_limit_switch_position[axis],
                 )
-                self.set_event(
+                await self.set_write_event(
                     self._max_lim_names[axis],
                     active=current_position[axis]
                     > self.max_limit_switch_position[axis],
@@ -748,12 +750,16 @@ class ATMCSCsc(salobj.BaseCsc):
             # Handle brakes
             for axis in Axis:
                 for brake_name in self._brake_names[axis]:
-                    self.set_event(brake_name, engaged=not self._axis_enabled[axis])
+                    await self.set_write_event(
+                        brake_name, engaged=not self._axis_enabled[axis]
+                    )
 
             # Handle drive status (which means enabled)
             for axis in Axis:
                 for evt_name in self._drive_status_names[axis]:
-                    self.set_event(evt_name, enable=self._axis_enabled[axis])
+                    await self.set_write_event(
+                        evt_name, enable=self._axis_enabled[axis]
+                    )
 
             # Handle atMountState
             if self._tracking_enabled:
@@ -765,32 +771,34 @@ class ATMCSCsc(salobj.BaseCsc):
                 mount_state = AtMountState.STOPPING
             else:
                 mount_state = AtMountState.TRACKINGDISABLED
-            self.evt_atMountState.set_put(state=mount_state)
+            await self.evt_atMountState.set_write(state=mount_state)
 
             # Handle azimuth topple block
             if current_position[Axis.Azimuth] < self.topple_azimuth[0]:
-                self.evt_azimuthToppleBlockCCW.set_put(active=True)
-                self.evt_azimuthToppleBlockCW.set_put(active=False)
+                await self.evt_azimuthToppleBlockCCW.set_write(active=True)
+                await self.evt_azimuthToppleBlockCW.set_write(active=False)
             elif current_position[Axis.Azimuth] > self.topple_azimuth[1]:
-                self.evt_azimuthToppleBlockCCW.set_put(active=False)
-                self.evt_azimuthToppleBlockCW.set_put(active=True)
+                await self.evt_azimuthToppleBlockCCW.set_write(active=False)
+                await self.evt_azimuthToppleBlockCW.set_write(active=True)
             else:
-                self.evt_azimuthToppleBlockCCW.set_put(active=False)
-                self.evt_azimuthToppleBlockCW.set_put(active=False)
+                await self.evt_azimuthToppleBlockCCW.set_write(active=False)
+                await self.evt_azimuthToppleBlockCW.set_write(active=False)
 
             # Handle m3InPosition
             # M3 is in position if the current velocity is 0
             # and the current position equals the commanded position.
             m3_in_position = self.m3_in_position(tai)
-            self.evt_m3InPosition.set_put(inPosition=m3_in_position)
+            await self.evt_m3InPosition.set_write(inPosition=m3_in_position)
 
             # Handle "in position" events for the main axes.
             # Main axes are in position if enabled
             # and actuator.kind(tai) is tracking.
             if not self._tracking_enabled:
                 for axis in MainAxes:
-                    self.set_event(self._in_position_names[axis], inPosition=False)
-                self.evt_allAxesInPosition.set_put(inPosition=False)
+                    await self.set_write_event(
+                        self._in_position_names[axis], inPosition=False
+                    )
+                await self.evt_allAxesInPosition.set_write(inPosition=False)
             else:
                 all_in_position = m3_in_position
                 for axis in MainAxes:
@@ -801,10 +809,10 @@ class ATMCSCsc(salobj.BaseCsc):
                         in_position = actuator.kind(tai) == actuator.Kind.Tracking
                     if not in_position and axis in axes_in_use:
                         all_in_position = False
-                    self.set_event(
+                    await self.set_write_event(
                         self._in_position_names[axis], inPosition=in_position
                     )
-                self.evt_allAxesInPosition.set_put(inPosition=all_in_position)
+                await self.evt_allAxesInPosition.set_write(inPosition=all_in_position)
 
             # compute m3_state for use setting m3State.state
             # and m3RotatorDetentSwitches
@@ -825,7 +833,7 @@ class ATMCSCsc(salobj.BaseCsc):
             assert m3_state is not None
 
             # handle m3State
-            self.evt_m3State.set_put(state=m3_state)
+            await self.evt_m3State.set_write(state=m3_state)
 
             # Handle M3 detent switch
             detent_map = {
@@ -838,12 +846,12 @@ class ATMCSCsc(salobj.BaseCsc):
                 (field_name, field_name == at_field)
                 for field_name in detent_map.values()
             )
-            self.evt_m3RotatorDetentSwitches.set_put(**detent_values)
+            await self.evt_m3RotatorDetentSwitches.set_write(**detent_values)
         except Exception as e:
             print(f"update_events failed: {e}")
             raise
 
-    def update_telemetry(self):
+    async def update_telemetry(self):
         """Output all telemetry topics."""
         try:
             nitems = len(self.tel_mount_AzEl_Encoders.data.elevationEncoder1Raw)
@@ -1007,14 +1015,16 @@ class ATMCSCsc(salobj.BaseCsc):
                     i
                 ] = motor_encoder_counts[Axis.M3]
 
-            self.tel_trajectory.set_put(cRIO_timestamp=times[0])
-            self.tel_mount_AzEl_Encoders.set_put(cRIO_timestamp=times[0])
-            self.tel_mount_Nasmyth_Encoders.set_put(cRIO_timestamp=times[0])
-            self.tel_torqueDemand.set_put(cRIO_timestamp=times[0])
-            self.tel_measuredTorque.set_put(cRIO_timestamp=times[0])
-            self.tel_measuredMotorVelocity.set_put(cRIO_timestamp=times[0])
-            self.tel_azEl_mountMotorEncoders.set_put(cRIO_timestamp=times[0])
-            self.tel_nasymth_m3_mountMotorEncoders.set_put(cRIO_timestamp=times[0])
+            await self.tel_trajectory.set_write(cRIO_timestamp=times[0])
+            await self.tel_mount_AzEl_Encoders.set_write(cRIO_timestamp=times[0])
+            await self.tel_mount_Nasmyth_Encoders.set_write(cRIO_timestamp=times[0])
+            await self.tel_torqueDemand.set_write(cRIO_timestamp=times[0])
+            await self.tel_measuredTorque.set_write(cRIO_timestamp=times[0])
+            await self.tel_measuredMotorVelocity.set_write(cRIO_timestamp=times[0])
+            await self.tel_azEl_mountMotorEncoders.set_write(cRIO_timestamp=times[0])
+            await self.tel_nasymth_m3_mountMotorEncoders.set_write(
+                cRIO_timestamp=times[0]
+            )
         except Exception as e:
             print(f"update_telemetry failed: {e}")
             raise
@@ -1038,10 +1048,10 @@ class ATMCSCsc(salobj.BaseCsc):
         while self.summary_state in (salobj.State.DISABLED, salobj.State.ENABLED):
             # update events first so that limits are handled
             i += 1
-            self.update_events()
+            await self.update_events()
 
             if i >= self._events_per_telemetry:
                 i = 0
-                self.update_telemetry()
+                await self.update_telemetry()
 
             await asyncio.sleep(self._telemetry_interval / self._events_per_telemetry)
