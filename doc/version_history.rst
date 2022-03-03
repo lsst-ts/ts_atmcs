@@ -6,6 +6,21 @@
 Version History
 ###############
 
+v1.2.1
+------
+
+Changes:
+
+* tests/test_csc.py test_initial_state: update the list of initial events to skip to remove obsolete events.
+
+Requires:
+
+* ts_salobj 7
+* ts_utils 1
+* ts_simactuators 2
+* ts_idl 2
+* IDL file for ATMCS built from ts_xml 11
+
 v1.2.0
 ------
 
