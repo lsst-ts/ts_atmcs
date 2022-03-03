@@ -110,15 +110,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                     "m3PortSelected",  # output by setInstrumentPort
                     "target",  # output by trackTarget
                     "summaryState",  # already read
-                    "softwareVersions",  # not yet supported by salobj
-                    "authList",  # only present for SAL 4.2 and later
-                    "appliedSettingsMatchStart",
-                    "detailedState",
-                    "errorCode",
-                    "logMessage",
-                    "settingVersions",
-                    "settingsApplied",  # not yet supported by salobj
-                    "largeFileObjectAvailable",  # not supported by CSC
+                    "softwareVersions",  # already read
+                    "logMessage",  # not reliably output
+                    "detailedState",  # not output by the simulator
                 ):
                     continue
                 with self.subTest(event_name=event_name):
