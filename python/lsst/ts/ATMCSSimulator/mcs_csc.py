@@ -177,8 +177,8 @@ class ATMCSCsc(salobj.BaseCsc):
         self._kill_tracking_timer.cancel()
 
     async def start(self):
-        await self.configure()
         await super().start()
+        await self.configure()
 
     async def configure(
         self,
