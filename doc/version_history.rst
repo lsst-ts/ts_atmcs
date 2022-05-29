@@ -6,6 +6,14 @@
 Version History
 ###############
 
+v1.4.0
+------
+
+Changes:
+
+* Rename command-line scripts to remove ".py" suffix.
+* Build with pyproject.toml.
+
 v1.3.1
 ------
 
