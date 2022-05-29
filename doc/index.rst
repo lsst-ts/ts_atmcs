@@ -6,12 +6,21 @@
 lsst.ts.ATMCSSimulator
 ######################
 
+.. image:: https://img.shields.io/badge/Project Metadata-gray.svg
+    :target: https://ts-xml.lsst.io/index.html#index-master-csc-table-atmcs
+.. image:: https://img.shields.io/badge/SAL\ Interface-gray.svg
+    :target: https://ts-xml.lsst.io/sal_interfaces/ATMCS.html
+.. image:: https://img.shields.io/badge/GitHub-gray.svg
+    :target: https://github.com/lsst-ts/ts_ATMCSSimulator
+.. image:: https://img.shields.io/badge/Jira-gray.svg
+    :target: https://jira.lsstcorp.org/issues/?jql=project%3DDM%20AND%20labels%3Dts_ATMCSSimulator
+
 A simulator for the auxiliary telescope motor control system (ATMCS CSC).
 
 .. _lsst.ts.ATMCSSimulator-using:
 
-Using lsst.ts.ATMCSSimulator
-============================
+User Guide
+==========
 
 The package is compatible with LSST DM's ``scons`` build system and ``eups`` package management system.
 Assuming you have the basic LSST DM stack installed you can do the following, from within the package directory:
@@ -36,7 +45,7 @@ Contributing
 ============
 
 ``lsst.ts.ATMCSSimulator`` is developed at https://github.com/lsst-ts/ts_ATMCSSimulator.
-You can find Jira issues for this module using `labels=ts_ATMCSSimulator <https://jira.lsstcorp.org/issues/?jql=project%20%3D%20DM%20AND%20labels%20%20%3D%20ts_ATMCSSimulator>`_.
+You can find Jira issues for this module using `project=DM and labels=ts_ATMCSSimulator <https://jira.lsstcorp.org/issues/?jql=project%3DDM%20AND%20labels%3Dts_ATMCSSimulator>`_.
 
 .. _lsst.ts.ATMCSSimulator-pyapi:
 
