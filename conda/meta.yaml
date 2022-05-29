@@ -8,6 +8,8 @@ source:
 
 build:
   script: python -m pip install --no-deps --ignore-installed .
+  entry_points:
+    - run_atmcs_simulator = lsst.ts.ATMCSSimulator:run_atmcs_simulator
   script_env:
     - PATH
     - PYTHONPATH
@@ -30,6 +32,7 @@ test:
     - bin
     - tests
     - setup.cfg
+    - pyproject.toml
   commands:
     - py.test
 
