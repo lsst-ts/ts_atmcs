@@ -35,7 +35,7 @@ Assuming you have the basic LSST DM stack installed you can do the following, fr
 
 With the package built and set up you can run the simulator using:
 
-    run_atmcs_simulator.py
+    run_atmcs_simulator
 
 If you want a different configuration, you can call `ATMCSCsc.configure` (from Python, not SAL).
 
