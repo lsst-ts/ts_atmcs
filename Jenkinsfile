@@ -70,10 +70,6 @@ pipeline {
                         /home/saluser/.checkout_repo.sh ${WORK_BRANCHES}
                         git pull
 
-                        cd /home/saluser/repos/ts_config_attcs
-                        /home/saluser/.checkout_repo.sh ${WORK_BRANCHES}
-                        git pull
-
                         # Make IDL files
                         make_idl_files.py ${env.IDL_NAMES}
                     """
