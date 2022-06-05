@@ -17,8 +17,7 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
-import asyncio
+from lsst.ts.ATMCSSimulator import run_atmcs_simulator
 
-from lsst.ts import ATMCSSimulator
 
-asyncio.run(ATMCSSimulator.ATMCSCsc.amain(index=None))
+run_atmcs_simulator()

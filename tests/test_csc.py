@@ -428,7 +428,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
     async def test_bin_script(self):
         await self.check_bin_script(
-            name="ATMCS", index=None, exe_name="run_atmcs_simulator.py"
+            name="ATMCS", index=None, exe_name="run_atmcs_simulator"
         )
 
     async def test_track(self):
