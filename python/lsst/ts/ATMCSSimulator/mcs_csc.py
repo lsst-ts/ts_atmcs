@@ -19,7 +19,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-__all__ = ["ATMCSCsc", "Axis", "MainAxes"]
+__all__ = ["ATMCSCsc", "Axis", "MainAxes", "run_atmcs_simulator"]
 
 import asyncio
 import enum
@@ -177,8 +177,8 @@ class ATMCSCsc(salobj.BaseCsc):
         self._kill_tracking_timer.cancel()
 
     async def start(self):
-        await self.configure()
         await super().start()
+        await self.configure()
 
     async def configure(
         self,
@@ -1055,3 +1055,8 @@ class ATMCSCsc(salobj.BaseCsc):
                 await self.update_telemetry()
 
             await asyncio.sleep(self._telemetry_interval / self._events_per_telemetry)
+
+
+def run_atmcs_simulator():
+    """Run the ATMCS CSC simulator."""
+    asyncio.run(ATMCSCsc.amain(index=None))

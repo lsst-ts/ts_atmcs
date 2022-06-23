@@ -6,6 +6,33 @@
 Version History
 ###############
 
+v1.4.0
+------
+
+Changes:
+
+* Rename command-line scripts to remove ".py" suffix.
+* Build with pyproject.toml.
+
+v1.3.1
+------
+
+Changes:
+
+* `ATMCSCsc`: call ``super().start()`` at the beginning of the start method.
+  This requires ts_salobj 7.1.
+* ``setup.cfg``: set asyncio_mode = auto.
+* git ignore .hypothesis.
+* Modernize ``Jenkinsfile``.
+
+Requires:
+
+* ts_salobj 7.1
+* ts_utils 1
+* ts_simactuators 2
+* ts_idl 2
+* IDL file for ATMCS built from ts_xml 11
+
 v1.2.1
 ------
 
