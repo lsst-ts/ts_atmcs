@@ -42,7 +42,8 @@ pipeline {
                 // to WORKSPACE to have the authority to install the packages.
                 withEnv(["WHOME=${env.WORKSPACE}"]) {
                     sh """
-                        source /home/saluser/.setup_dev.sh || echo "Loading env failed; continuing..."
+                        # Configure OpenSplice DDS
+                        source /home/saluser/.setup_salobj.sh
 
                         # Update base required packages
                         cd /home/saluser/repos/ts_idl
@@ -70,7 +71,8 @@ pipeline {
                         /home/saluser/.checkout_repo.sh ${WORK_BRANCHES}
                         git pull
 
-                        # Make IDL files
+                        # Make IDL files; setup ts_sal to support this.
+                        setup ts_sal
                         make_idl_files.py ${env.IDL_NAMES}
                     """
                 }
@@ -80,7 +82,7 @@ pipeline {
             steps {
                 withEnv(["WHOME=${env.WORKSPACE}"]) {
                     sh """
-                        source /home/saluser/.setup_dev.sh || echo "Loading env failed; continuing..."
+                        source /home/saluser/.setup_salobj.sh
                         setup -r .
                         pytest --cov-report html --cov=${env.MODULE_NAME} --junitxml=${env.XML_REPORT_PATH}
                     """
@@ -91,7 +93,7 @@ pipeline {
             steps {
                 withEnv(["WHOME=${env.WORKSPACE}"]) {
                     sh """
-                        source /home/saluser/.setup_dev.sh || echo "Loading env failed; continuing..."
+                        source /home/saluser/.setup_salobj.sh
                         setup -r .
                         package-docs build
                     """
@@ -103,7 +105,7 @@ pipeline {
                 withEnv(["WHOME=${env.WORKSPACE}"]) {
                     catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
                         sh '''
-                            source /home/saluser/.setup_dev.sh || echo "Loading env failed; continuing..."
+                            source /home/saluser/.setup_salobj.sh
                             setup -r .
                             ltd -u ${LSST_IO_CREDS_USR} -p ${LSST_IO_CREDS_PSW} upload \
                                 --product ${DOC_PRODUCT_NAME} --git-ref ${GIT_BRANCH} --dir doc/_build/html
