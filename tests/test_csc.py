@@ -1,4 +1,4 @@
-# This file is part of ts_ATMCSSimulator.
+# This file is part of ts_atmcssimulator.
 #
 # Developed for the LSST Data Management System.
 # This product includes software developed by the LSST Project
@@ -26,7 +26,7 @@ import pytest
 from lsst.ts import utils
 from lsst.ts import salobj
 from lsst.ts import simactuators
-from lsst.ts import ATMCSSimulator
+from lsst.ts import atmcssimulator
 from lsst.ts.idl.enums.ATMCS import AtMountState, M3ExitPort, M3State
 
 STD_TIMEOUT = 10  # standard timeout, seconds
@@ -74,7 +74,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         )
 
     def basic_make_csc(self, initial_state, config_dir, simulation_mode):
-        return ATMCSSimulator.ATMCSCsc(initial_state=initial_state)
+        return atmcssimulator.ATMCSCsc(initial_state=initial_state)
 
     async def fault_to_enabled(self):
         """Check that the CSC is in FAULT state and enable it.
@@ -101,7 +101,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await self.assert_next_summary_state(salobj.State.ENABLED)
             await self.assert_next_sample(
                 topic=self.remote.evt_softwareVersions,
-                cscVersion=ATMCSSimulator.__version__ + " sim",
+                cscVersion=atmcssimulator.__version__ + " sim",
                 subsystemVersions="",
             )
 
@@ -182,8 +182,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 self.remote.evt_atMountState, state=AtMountState.TRACKINGDISABLED
             )
 
-            for axis in ATMCSSimulator.Axis:
-                if axis is ATMCSSimulator.Axis.M3:
+            for axis in atmcssimulator.Axis:
+                if axis is atmcssimulator.Axis.M3:
                     continue  # trackTarget doesn't accept M3
 
                 with self.subTest(axis=axis):
@@ -378,7 +378,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             with salobj.assertRaisesAckError():
                 await self.remote.cmd_startTracking.start()
 
-            actuator = self.csc.actuators[ATMCSSimulator.Axis.M3]
+            actuator = self.csc.actuators[atmcssimulator.Axis.M3]
             curr_segment = actuator.path.at(utils.current_tai())
             assert curr_segment.velocity != 0
 
