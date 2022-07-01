@@ -81,7 +81,8 @@ class ATMCSCsc(salobj.BaseCsc):
     """
 
     valid_simulation_modes = [1]
-    version = __version__ + "-sim"
+    # Append "-sim" to avoid confusion with the real ATMCS CSC.
+    version = f"{__version__}-sim"
 
     def __init__(self, initial_state=salobj.State.STANDBY):
         super().__init__(
