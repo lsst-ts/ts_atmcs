@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# This file is part of ts_ATMCSSimulator.
+# This file is part of ts_atmcssimulator.
 #
 # Developed for the LSST Data Management System.
 # This product includes software developed by the LSST Project
@@ -17,7 +17,7 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
-from lsst.ts.ATMCSSimulator import run_atmcs_simulator
+from lsst.ts.atmcssimulator import run_atmcs_simulator
 
 
 run_atmcs_simulator()

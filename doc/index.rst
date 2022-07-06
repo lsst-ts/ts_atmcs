@@ -1,9 +1,9 @@
-.. py:currentmodule:: lsst.ts.ATMCSSimulator
+.. py:currentmodule:: lsst.ts.atmcssimulator
 
-.. _lsst.ts.ATMCSSimulator:
+.. _lsst.ts.atmcssimulator:
 
 ######################
-lsst.ts.ATMCSSimulator
+lsst.ts.atmcssimulator
 ######################
 
 .. image:: https://img.shields.io/badge/Project Metadata-gray.svg
@@ -11,13 +11,13 @@ lsst.ts.ATMCSSimulator
 .. image:: https://img.shields.io/badge/SAL\ Interface-gray.svg
     :target: https://ts-xml.lsst.io/sal_interfaces/ATMCS.html
 .. image:: https://img.shields.io/badge/GitHub-gray.svg
-    :target: https://github.com/lsst-ts/ts_ATMCSSimulator
+    :target: https://github.com/lsst-ts/ts_atmcssimulator
 .. image:: https://img.shields.io/badge/Jira-gray.svg
-    :target: https://jira.lsstcorp.org/issues/?jql=project%3DDM%20AND%20labels%3Dts_ATMCSSimulator
+    :target: https://jira.lsstcorp.org/issues/?jql=project%3DDM%20AND%20labels%3Dts_atmcssimulator
 
 A simulator for the auxiliary telescope motor control system (ATMCS CSC).
 
-.. _lsst.ts.ATMCSSimulator-using:
+.. _lsst.ts.atmcssimulator-using:
 
 User Guide
 ==========
@@ -39,20 +39,20 @@ With the package built and set up you can run the simulator using:
 
 If you want a different configuration, you can call `ATMCSCsc.configure` (from Python, not SAL).
 
-.. _lsst.ts.ATMCSSimulator-contributing:
+.. _lsst.ts.atmcssimulator-contributing:
 
 Contributing
 ============
 
-``lsst.ts.ATMCSSimulator`` is developed at https://github.com/lsst-ts/ts_ATMCSSimulator.
-You can find Jira issues for this module using `project=DM and labels=ts_ATMCSSimulator <https://jira.lsstcorp.org/issues/?jql=project%3DDM%20AND%20labels%3Dts_ATMCSSimulator>`_.
+``lsst.ts.atmcssimulator`` is developed at https://github.com/lsst-ts/ts_atmcssimulator.
+You can find Jira issues for this module using `project=DM and labels=ts_atmcssimulator <https://jira.lsstcorp.org/issues/?jql=project%3DDM%20AND%20labels%3Dts_atmcssimulator>`_.
 
-.. _lsst.ts.ATMCSSimulator-pyapi:
+.. _lsst.ts.atmcssimulator-pyapi:
 
 Python API reference
 ====================
 
-.. automodapi:: lsst.ts.ATMCSSimulator
+.. automodapi:: lsst.ts.atmcssimulator
    :no-main-docstr:
 
 Version History

@@ -24,7 +24,7 @@ pipeline {
     }
     environment {
         // Python module name.
-        MODULE_NAME = "lsst.ts.ATMCSSimulator"
+        MODULE_NAME = "lsst.ts.atmcssimulator"
         // Space-separated list of SAL component names for all IDL files required.
         IDL_NAMES = "ATMCS"
         // Product name for documentation upload; the associated
@@ -38,11 +38,12 @@ pipeline {
     stages {
         stage ('Update branches of required packages') {
             steps {
-                // When using the docker container, we need to change the HOME path
+                // When using the docker container, we need to change the WHOME path
                 // to WORKSPACE to have the authority to install the packages.
-                withEnv(["HOME=${env.WORKSPACE}"]) {
+                withEnv(["WHOME=${env.WORKSPACE}"]) {
                     sh """
-                        source /home/saluser/.setup_dev.sh || echo "Loading env failed; continuing..."
+                        # Configure OpenSplice DDS
+                        source /home/saluser/.setup_salobj.sh
 
                         # Update base required packages
                         cd /home/saluser/repos/ts_idl
@@ -70,7 +71,8 @@ pipeline {
                         /home/saluser/.checkout_repo.sh ${WORK_BRANCHES}
                         git pull
 
-                        # Make IDL files
+                        # Make IDL files; setup ts_sal to support this.
+                        setup ts_sal
                         make_idl_files.py ${env.IDL_NAMES}
                     """
                 }
@@ -78,9 +80,9 @@ pipeline {
         }
         stage('Run unit tests') {
             steps {
-                withEnv(["HOME=${env.WORKSPACE}"]) {
+                withEnv(["WHOME=${env.WORKSPACE}"]) {
                     sh """
-                        source /home/saluser/.setup_dev.sh || echo "Loading env failed; continuing..."
+                        source /home/saluser/.setup_salobj.sh
                         setup -r .
                         pytest --cov-report html --cov=${env.MODULE_NAME} --junitxml=${env.XML_REPORT_PATH}
                     """
@@ -89,9 +91,9 @@ pipeline {
         }
         stage('Build documentation') {
             steps {
-                withEnv(["HOME=${env.WORKSPACE}"]) {
+                withEnv(["WHOME=${env.WORKSPACE}"]) {
                     sh """
-                        source /home/saluser/.setup_dev.sh || echo "Loading env failed; continuing..."
+                        source /home/saluser/.setup_salobj.sh
                         setup -r .
                         package-docs build
                     """
@@ -100,10 +102,10 @@ pipeline {
         }
         stage('Try to upload documentation') {
             steps {
-                withEnv(["HOME=${env.WORKSPACE}"]) {
+                withEnv(["WHOME=${env.WORKSPACE}"]) {
                     catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
                         sh '''
-                            source /home/saluser/.setup_dev.sh || echo "Loading env failed; continuing..."
+                            source /home/saluser/.setup_salobj.sh
                             setup -r .
                             ltd -u ${LSST_IO_CREDS_USR} -p ${LSST_IO_CREDS_PSW} upload \
                                 --product ${DOC_PRODUCT_NAME} --git-ref ${GIT_BRANCH} --dir doc/_build/html
