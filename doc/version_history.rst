@@ -1,10 +1,28 @@
-.. py:currentmodule:: lsst.ts.ATMCSSimulator
+.. py:currentmodule:: lsst.ts.
 
-.. _lsst.ts.ATMCSSimulator.version_history:
+.. _lsst.ts.atmcssimulator.version_history:
 
 ###############
 Version History
 ###############
+
+v1.5.0
+------
+
+Changes:
+
+* Rename the package from ts_ATMCSSimulator to ts_atmcssimulator.
+* Change reported cscVersion suffix from " sim" to "-sim".
+* conda/meta.yaml: update to support multiple versions of Python.
+* Jenkinsfile.conda: remove mention of ts_config_attcs; this CSC is not configurable.
+
+Requires:
+
+* ts_salobj 7.1
+* ts_utils 1
+* ts_simactuators 2
+* ts_idl 2
+* IDL file for ATMCS built from ts_xml 11
 
 v1.4.0
 ------

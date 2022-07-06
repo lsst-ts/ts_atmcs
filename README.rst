@@ -1,8 +1,8 @@
 #################
-ts_ATMCSSimulator
+ts_atmcssimulator
 #################
 
-``ts_ATMCSSimulator`` is an LSST Telescope and Site package that provides a simulator for the auxiliary telescope motor control system (ATMCS).
+``ts_atmcssimulator`` is an LSST Telescope and Site package that provides a simulator for the auxiliary telescope motor control system (ATMCS).
 
 `Documentation <https://ts-atmcssimulator.lsst.io>`_
 
