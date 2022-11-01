@@ -6,6 +6,23 @@
 Version History
 ###############
 
+v1.5.1
+------
+
+Changes:
+
+* Update ``ATMCSCsc.update_events`` to map the exit port enumeration name to the m3 state enumeration value when m3 is in position.
+* Minor patch in ``ATMCSCsc.m3_port_rot`` to ignore ``m3_state`` when unpacking ``_port_info_dict``.
+
+
+Requires:
+
+* ts_salobj 7.1
+* ts_utils 1
+* ts_simactuators 2
+* ts_idl 2
+* IDL file for ATMCS built from ts_xml 11
+
 v1.5.0
 ------
 
