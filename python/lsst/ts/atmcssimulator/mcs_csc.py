@@ -819,14 +819,16 @@ class ATMCSCsc(salobj.BaseCsc):
             # and m3RotatorDetentSwitches
             m3_state = None
             if m3_in_position:
-                # we are either at a port or at an unknown position
-                # exit port enum values = m3state enum values
-                # for the known exit ports
-                if exit_port is not None:
-                    m3_state = exit_port
-                else:
-                    # Move is finished, but not at a known point
-                    m3_state = M3State.UNKNOWNPOSITION
+                # We are either at a port or at an unknown position. Use the
+                # _port_info_dict to map between exit port value and m3 state.
+                # If port is not mapped use unknown position. This is needed
+                # in case the exit port value does not match the m3 state
+                # value.
+                # TODO: DM-36825 Remove mapping once the enumeration values
+                # match.
+                m3_state = self._port_info_dict.get(
+                    exit_port, (None, M3State.UNKNOWNPOSITION, None)
+                )[1]
             elif m3actuator.kind(tai) == m3actuator.Kind.Slewing:
                 m3_state = M3State.INMOTION
             else:
