@@ -577,7 +577,7 @@ class ATMCSCsc(salobj.BaseCsc):
         if not self.m3_in_position(tai):
             return (None, None)
         target_position = self.actuators[Axis.M3].target.position
-        for exit_port, (ind, m3state, rot_axis) in self._port_info_dict.items():
+        for exit_port, (ind, _, rot_axis) in self._port_info_dict.items():
             if self.m3_port_positions[ind] == target_position:
                 return (exit_port, rot_axis)
         return (None, None)
