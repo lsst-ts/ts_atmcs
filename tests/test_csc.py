@@ -265,7 +265,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
     async def test_brake_and_drive_status_events(self):
         async with self.make_csc(initial_state=salobj.State.STANDBY):
-
             # Axes start disabled.
             for event in self.brake_events:
                 await self.assert_next_sample(event, engaged=True)
