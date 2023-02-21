@@ -35,7 +35,7 @@ test:
     - setup.cfg
     - tests
   commands:
-    - py.test
+    - pytest
 
 requirements:
   host:
