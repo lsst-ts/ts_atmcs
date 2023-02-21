@@ -6,14 +6,25 @@
 Version History
 ###############
 
+v1.5.2
+------
+
+* pre-commit: update black to 23.1.0 and pre-commit-hooks to v4.4.0 and add isort.
+* ``Jenkinsfile``: stop running as root.
+
+Requires:
+
+* ts_salobj 7.1
+* ts_utils 1
+* ts_simactuators 2
+* ts_idl 2
+* IDL file for ATMCS built from ts_xml 11
+
 v1.5.1
 ------
 
-Changes:
-
 * Update ``ATMCSCsc.update_events`` to map the exit port enumeration name to the m3 state enumeration value when m3 is in position.
 * Minor patch in ``ATMCSCsc.m3_port_rot`` to ignore ``m3_state`` when unpacking ``_port_info_dict``.
-
 
 Requires:
 
@@ -25,8 +36,6 @@ Requires:
 
 v1.5.0
 ------
-
-Changes:
 
 * Rename the package from ts_ATMCSSimulator to ts_atmcssimulator.
 * Change reported cscVersion suffix from " sim" to "-sim".
@@ -44,15 +53,11 @@ Requires:
 v1.4.0
 ------
 
-Changes:
-
 * Rename command-line scripts to remove ".py" suffix.
 * Build with pyproject.toml.
 
 v1.3.1
 ------
-
-Changes:
 
 * `ATMCSCsc`: call ``super().start()`` at the beginning of the start method.
   This requires ts_salobj 7.1.
@@ -71,8 +76,6 @@ Requires:
 v1.2.1
 ------
 
-Changes:
-
 * tests/test_csc.py test_initial_state: update the list of initial events to skip to remove obsolete events.
 
 Requires:
@@ -85,8 +88,6 @@ Requires:
 
 v1.2.0
 ------
-
-Changes:
 
 * Update for ts_salobj v7, which is required.
   This also requires ts_xml 11.
@@ -104,8 +105,6 @@ Requires:
 v1.1.4
 ------
 
-Changes:
-
 * Update `test_initial_info` in `test_csc` to ignore `largeFileObjectAvailable` new generic event (ts_xml >10).
 * Update calls to methods that moved from `lsst.ts.salobj` to `lsst.ts.utils`.
 * Modernize ``doc/conf.py`` for documenteer 0.6.
@@ -122,8 +121,6 @@ Requires:
 v1.1.3
 ------
 
-Changes:
-
 * Use `unittest.IsolatedAsyncioTestCase` instead of the abandoned asynctest package.
 * Use pre-commit instead of a custom pre-commit hook; see the README.md for instructions.
 * Format the code with black 20.8b1.
@@ -139,8 +136,6 @@ Requires:
 
 v1.1.2
 ------
-
-Changes:
 
 * `ATMCSCsc`: set class variable ``version`` to the package version + " sim", to differentiate between this and the real ATMCS CSC.
   Test that this properly sets the ``cscVersion`` field of the ``softwareVersions`` event.
@@ -173,8 +168,6 @@ Requires:
 v1.1.0
 ------
 
-Changes:
-
 * Updated for ts_salobj 6.1.
 * Updated `ATMCSCsc.set_event` to return ``did_put``, for debugging.
 * Defined `ATMCSCsc` class variable ``valid_simulation_modes`` to eliminate a deprecation warning.
@@ -192,8 +185,6 @@ Requires:
 v1.0.4
 ------
 
-Changes:
-
 * Update deprecated code for compatibility with ts_salobj 6 (and 5).
 * Add black to conda test dependencies
 
@@ -208,8 +199,6 @@ Requires:
 v1.0.3
 ------
 
-Changes:
-
 * Update for compatibility with ts_salobj 5.13.
 
 Requires:
@@ -222,8 +211,6 @@ Requires:
 
 v1.0.2
 ------
-
-Changes:
 
 * Add a test that code is formatted with black.
   This requires ts_salobj 5.11.
@@ -241,8 +228,6 @@ Requires:
 
 v1.0.1
 ------
-
-Changes:
 
 * Include conda package build configuration.
 * Added a Jenkinsfile to support continuous integration and to build conda packages.
@@ -272,9 +257,7 @@ Requires:
 v0.11.0
 ------=
 
-Major changes:
-
-* Update for a change to the XML.
+Major * Update for a change to the XML.
 * Updated test_csc.py to use `lsst.ts.salobj.BaseCscTestCase`.
 * Added a revision history.
 * Code formatted by ``black``, with a pre-commit hook to enforce this. See the README file for configuration instructions.
@@ -290,9 +273,7 @@ Requires:
 v0.10.1
 ------=
 
-Major changes:
-
-* Added jenkins build.
+Major * Added jenkins build.
 
 Requires:
 
@@ -304,9 +285,7 @@ Requires:
 v0.10.0
 ------=
 
-Major changes:
-
-* Update to use ts_simactuators.
+Major * Update to use ts_simactuators.
 * Update unit tests to use asynctest.
 
 Requires:
@@ -319,9 +298,7 @@ Requires:
 v0.9.0
 ------
 
-Major changes:
-
-* Update for ts_salobj 5.2.
+Major * Update for ts_salobj 5.2.
 * Use simulation_mode instead of initial_simulation_mode
 
 Requires:
@@ -343,13 +320,9 @@ Requirements:
 v0.8.2
 ------
 
-Major changes:
+Major * Allow using the package without scons.
 
-* Allow using the package without scons.
-
-Other changes:
-
-* Fix a bug in TPVAJ.pva.
+Other * Fix a bug in TPVAJ.pva.
 * Modernize calling `BaseCsc.fault` to simplify the code and eliminate a deprecation warning.
 
 Requirements:
@@ -373,9 +346,7 @@ Requirements:
 v0.8.0
 ------
 
-Major changes:
-
-Output the new positionLimits event.
+Major Output the new positionLimits event.
 
 Requirements:
 
@@ -386,9 +357,7 @@ Requirements:
 v0.7.0
 ------
 
-Major changes:
-
-* Update for changes to ATMCS topics
+Major * Update for changes to ATMCS topics
 * Most telemetry topic fields are now arrays.
 * Added a few fields to the trackTarget command and target event.
 
@@ -401,9 +370,7 @@ Requirements:
 v0.6.0
 ------
 
-Major changes:
-
-* Use OpenSplice dds.
+Major * Use OpenSplice dds.
 * Do not enable unused axes.
 
 Requirements:

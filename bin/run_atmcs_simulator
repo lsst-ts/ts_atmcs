@@ -19,5 +19,4 @@
 #
 from lsst.ts.atmcssimulator import run_atmcs_simulator
 
-
 run_atmcs_simulator()

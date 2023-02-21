@@ -22,11 +22,7 @@ import asyncio
 import unittest
 
 import pytest
-
-from lsst.ts import utils
-from lsst.ts import salobj
-from lsst.ts import simactuators
-from lsst.ts import atmcssimulator
+from lsst.ts import atmcssimulator, salobj, simactuators, utils
 from lsst.ts.idl.enums.ATMCS import AtMountState, M3ExitPort, M3State
 
 STD_TIMEOUT = 10  # standard timeout, seconds
