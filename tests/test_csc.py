@@ -22,11 +22,7 @@ import asyncio
 import unittest
 
 import pytest
-
-from lsst.ts import utils
-from lsst.ts import salobj
-from lsst.ts import simactuators
-from lsst.ts import atmcssimulator
+from lsst.ts import atmcssimulator, salobj, simactuators, utils
 from lsst.ts.idl.enums.ATMCS import AtMountState, M3ExitPort, M3State
 
 STD_TIMEOUT = 10  # standard timeout, seconds
@@ -269,7 +265,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
     async def test_brake_and_drive_status_events(self):
         async with self.make_csc(initial_state=salobj.State.STANDBY):
-
             # Axes start disabled.
             for event in self.brake_events:
                 await self.assert_next_sample(event, engaged=True)

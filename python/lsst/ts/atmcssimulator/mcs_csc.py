@@ -25,11 +25,9 @@ import asyncio
 import enum
 
 import numpy as np
-
-from lsst.ts import utils
-from lsst.ts import salobj
-from lsst.ts import simactuators
+from lsst.ts import salobj, simactuators, utils
 from lsst.ts.idl.enums.ATMCS import AtMountState, M3ExitPort, M3State
+
 from . import __version__
 
 
