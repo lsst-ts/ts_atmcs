@@ -1,0 +1,18 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+        "id": {
+            "const": "nasmyth1DriveStatus"
+        },
+        "enable": {
+            "type": "boolean",
+            "description": "True if the state of the Nasmyth 1 rotator is enabled"
+        }
+    },
+    "required": [
+        "id",
+        "enable"
+    ],
+    "additionalProperties": false
+}

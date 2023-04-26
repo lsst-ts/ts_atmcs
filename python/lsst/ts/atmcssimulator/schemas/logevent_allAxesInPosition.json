@@ -1,0 +1,18 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+        "id": {
+            "const": "allAxesInPosition"
+        },
+        "inPosition": {
+            "type": "boolean",
+            "description": "True if all axes are in position"
+        }
+    },
+    "required": [
+        "id",
+        "inPosition"
+    ],
+    "additionalProperties": false
+}

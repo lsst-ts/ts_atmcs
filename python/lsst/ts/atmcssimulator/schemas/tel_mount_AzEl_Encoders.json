@@ -1,0 +1,119 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+        "id": {
+            "const": "mount_AzEl_Encoders"
+        },
+        "cRIO_timestamp": {
+            "type": "number",
+            "description": "Time for the first sample of each telemetry item in this topic, as measured by the cRIO clock, as unix time."
+        },
+        "elevationCalculatedAngle": {
+            "type": "array",
+            "minItems": 100,
+            "maxItems": 100,
+            "description": "Elevation axis position computed from the axis encoders at 100 Hz beginning at the specified time.",
+            "items": [
+                {
+                    "type": "number"
+                }
+            ]
+        },
+        "azimuthCalculatedAngle": {
+            "type": "array",
+            "minItems": 100,
+            "maxItems": 100,
+            "description": "Azimuth axis position computed from the axis encoders at 100 Hz beginning at the specified time. The range is the hard stop limits (L3), approximately -280 to 280.",
+            "items": [
+                {
+                    "type": "number"
+                }
+            ]
+        },
+        "elevationEncoder1Raw": {
+            "type": "array",
+            "minItems": 100,
+            "maxItems": 100,
+            "description": "Position (in encoder counts) reported by elevation axis encoder 1 at 100 Hz beginning at the specified time.",
+            "items": [
+                {
+                    "type": "number"
+                }
+            ]
+        },
+        "elevationEncoder2Raw": {
+            "type": "array",
+            "minItems": 100,
+            "maxItems": 100,
+            "description": "Position (in encoder counts) reported by elevation axis encoder 2 at 100 Hz beginning at the specified time.",
+            "items": [
+                {
+                    "type": "number"
+                }
+            ]
+        },
+        "elevationEncoder3Raw": {
+            "type": "array",
+            "minItems": 100,
+            "maxItems": 100,
+            "description": "Position (in encoder counts) reported by elevation axis encoder 3 at 100 Hz beginning at the specified time.",
+            "items": [
+                {
+                    "type": "number"
+                }
+            ]
+        },
+        "azimuthEncoder1Raw": {
+            "type": "array",
+            "minItems": 100,
+            "maxItems": 100,
+            "description": "Position (in encoder counts) reported by azimuth axis encoder 1 at 100 Hz beginning at the specified time.",
+            "items": [
+                {
+                    "type": "number"
+                }
+            ]
+        },
+        "azimuthEncoder2Raw": {
+            "type": "array",
+            "minItems": 100,
+            "maxItems": 100,
+            "description": "Position (in encoder counts) reported by azimuth axis encoder 2 at 100 Hz beginning at the specified time.",
+            "items": [
+                {
+                    "type": "number"
+                }
+            ]
+        },
+        "azimuthEncoder3Raw": {
+            "type": "array",
+            "minItems": 100,
+            "maxItems": 100,
+            "description": "Position (in encoder counts) reported by azimuth axis encoder 3 at 100 Hz beginning at the specified time.",
+            "items": [
+                {
+                    "type": "number"
+                }
+            ]
+        },
+        "trackId": {
+            "type": "number",
+            "description": "Unique identifier given by the ATPoining Component"
+        }
+    },
+    "required": [
+        "id",
+        "cRIO_timestamp",
+        "elevationCalculatedAngle",
+        "azimuthCalculatedAngle",
+        "elevationEncoder1Raw",
+        "elevationEncoder2Raw",
+        "elevationEncoder3Raw",
+        "azimuthEncoder1Raw",
+        "azimuthEncoder2Raw",
+        "azimuthEncoder3Raw",
+        "trackId"
+    ],
+    "additionalProperties": false
+}

@@ -6,6 +6,19 @@
 Version History
 ###############
 
+v1.5.3
+------
+
+* Add JSON schemas for command, event and telemetry exchange via TCP/IP.
+
+Requires:
+
+* ts_salobj 7.1
+* ts_utils 1
+* ts_simactuators 2
+* ts_idl 2
+* IDL file for ATMCS built from ts_xml 11
+
 v1.5.2
 ------
 

@@ -1,0 +1,18 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+        "id": {
+            "const": "atMountState"
+        },
+        "state": {
+            "type": "number",
+            "description": "Describes if tracking is stopped/started or in the process of stopping"
+        }
+    },
+    "required": [
+        "id",
+        "state"
+    ],
+    "additionalProperties": false
+}
