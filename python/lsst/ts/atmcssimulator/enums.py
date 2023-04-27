@@ -19,13 +19,32 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-try:
-    from .version import *
-except ImportError:
-    __version__ = "?"
+from enum import Enum
 
-from .enums import *
-from .mcs_csc import *
-from .mcs_server_simulator import *
-from .mcs_simulator import *
-from .schemas import *
+__all__ = ["Ack", "CommandKey"]
+
+
+class Ack(str, Enum):
+    ACK = "ack"
+    FAIL = "fail"
+    NOACK = "noack"
+    SUCCESS = "success"
+
+
+class CommandKey(str, Enum):
+    AZIMUTH = "azimuth"
+    AZIMUTH_VELOCITY = "azimuthVelocity"
+    ELEVATION = "elevation"
+    ELEVATION_VELOCITY = "elevationVelocity"
+    ID = "id"
+    NASMYTH1_ROTATOR_ANGLE = "nasmyth1RotatorAngle"
+    NASMYTH1_ROTATOR_ANGLE_VELOCITY = "nasmyth1RotatorAngleVelocity"
+    NASMYTH2_ROTATOR_ANGLE = "nasmyth2RotatorAngle"
+    NASMYTH2_ROTATOR_ANGLE_VELOCITY = "nasmyth2RotatorAngleVelocity"
+    PORT = "port"
+    RA_DE_SYS = "radesys"
+    SEQUENCE_ID = "sequence_id"
+    TAI_TIME = "taiTime"
+    TRACK_ID = "trackId"
+    TRACK_SYS = "tracksys"
+    VALUE = "value"
