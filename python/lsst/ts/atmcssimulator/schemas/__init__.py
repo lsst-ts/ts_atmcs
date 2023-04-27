@@ -19,10 +19,4 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-try:
-    from .version import *
-except ImportError:
-    __version__ = "?"
-
-from .mcs_csc import *
-from .schemas import *
+from .registry import *
