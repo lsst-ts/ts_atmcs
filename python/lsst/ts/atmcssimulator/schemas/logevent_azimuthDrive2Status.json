@@ -1,0 +1,18 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+        "id": {
+            "const": "azimuthDrive2Status"
+        },
+        "enable": {
+            "type": "boolean",
+            "description": "True, if the state of the azimuth drive is enabled"
+        }
+    },
+    "required": [
+        "id",
+        "enable"
+    ],
+    "additionalProperties": false
+}

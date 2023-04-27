@@ -1,0 +1,18 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+        "id": {
+            "const": "m3State"
+        },
+        "state": {
+            "type": "number",
+            "description": "M3 rotator position/motion state"
+        }
+    },
+    "required": [
+        "id",
+        "state"
+    ],
+    "additionalProperties": false
+}
