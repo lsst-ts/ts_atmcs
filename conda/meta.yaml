@@ -32,7 +32,6 @@ test:
     - bin
     - pyproject.toml
     - python
-    - setup.cfg
     - tests
   commands:
     - pytest
