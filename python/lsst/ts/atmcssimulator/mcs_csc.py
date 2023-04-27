@@ -23,6 +23,7 @@ __all__ = ["ATMCSCsc", "Axis", "MainAxes", "run_atmcs_simulator"]
 
 import asyncio
 import enum
+from typing import Any
 
 import numpy as np
 from lsst.ts import salobj, simactuators, utils
@@ -82,7 +83,7 @@ class ATMCSCsc(salobj.BaseCsc):
     # Append "-sim" to avoid confusion with the real ATMCS CSC.
     version = f"{__version__}-sim"
 
-    def __init__(self, initial_state=salobj.State.STANDBY):
+    def __init__(self, initial_state: salobj.State = salobj.State.STANDBY) -> None:
         super().__init__(
             name="ATMCS", index=0, initial_state=initial_state, simulation_mode=1
         )
@@ -168,37 +169,69 @@ class ATMCSCsc(salobj.BaseCsc):
         # Timer to kill tracking if trackTarget doesn't arrive in time.
         self._kill_tracking_timer = utils.make_done_future()
 
-    async def close_tasks(self):
+        # TODO DM-38912 Make this CSC configurable.
+        # Configuration items.
+        self.max_tracking_interval = np.full(5, 0.0)
+        self.min_commanded_position = np.full(5, 0.0)
+        self.max_commanded_position = np.full(5, 0.0)
+        self.min_limit_switch_position = np.full(5, 0.0)
+        self.max_limit_switch_position = np.full(5, 0.0)
+        self.max_velocity = np.full(5, 0.0)
+        self.topple_azimuth = np.full(5, 0.0)
+        self.m3_port_positions = np.full(5, 0.0)
+        self.axis_encoder_counts_per_deg = np.full(5, 0.0)
+        self.motor_encoder_counts_per_deg = np.full(5, 0.0)
+        self.motor_axis_ratio = np.full(5, 0.0)
+        self.torque_per_accel = np.full(5, 0.0)
+        self.nsettle = 0
+        self.limit_overtravel = 0
+        self.actuators: list[simactuators.TrackingActuator] = []
+        # allowed position error for M3 to be considered in position (deg)
+        self.m3tolerance = 1e-5
+
+    async def close_tasks(self) -> None:
         await super().close_tasks()
         self._disable_all_drives_task.cancel()
         self._stop_tracking_task.cancel()
         self._events_and_telemetry_task.cancel()
         self._kill_tracking_timer.cancel()
 
-    async def start(self):
+    async def start(self) -> None:
         await super().start()
         await self.configure()
 
+    # TODO DM-38912 Make this CSC configurable.
     async def configure(
         self,
-        max_tracking_interval=2.5,
-        min_commanded_position=(5, -270, -165, -165, 0),
-        max_commanded_position=(90, 270, 165, 165, 180),
-        start_position=(80, 0, 0, 0, 0),
-        min_limit_switch_position=(3, -272, -167, -167, -2),
-        max_limit_switch_position=(92, 272, 167, 167, 182),
-        max_velocity=(5, 5, 5, 5, 5),
-        max_acceleration=(3, 3, 3, 3, 3),
-        topple_azimuth=(2, 5),
-        m3_port_positions=(0, 180, 90),
-        needed_in_pos=3,
-        axis_encoder_counts_per_deg=(3.6e6, 3.6e6, 3.6e6, 3.6e6, 3.6e6),
-        motor_encoder_counts_per_deg=(3.6e5, 3.6e5, 3.6e5, 3.6e5, 3.6e5),
-        motor_axis_ratio=(100, 100, 100, 100, 100),
-        torque_per_accel=(1, 1, 1, 1, 1),
-        nsettle=2,
-        limit_overtravel=1,
-    ):
+        max_tracking_interval: float = 2.5,
+        min_commanded_position: np.ndarray = np.array(
+            [5, -270, -165, -165, 0], dtype=float
+        ),
+        max_commanded_position: np.ndarray = np.array(
+            [90, 270, 165, 165, 180], dtype=float
+        ),
+        start_position: np.ndarray = np.array([80, 0, 0, 0, 0], dtype=float),
+        min_limit_switch_position: np.ndarray = np.array(
+            [3, -272, -167, -167, -2], dtype=float
+        ),
+        max_limit_switch_position: np.ndarray = np.array(
+            [92, 272, 167, 167, 182], dtype=float
+        ),
+        max_velocity: np.ndarray = np.array([5, 5, 5, 5, 5], dtype=float),
+        max_acceleration: np.ndarray = np.array([3, 3, 3, 3, 3], dtype=float),
+        topple_azimuth: np.ndarray = np.array([2, 5], dtype=float),
+        m3_port_positions: np.ndarray = np.array([0, 180, 90], dtype=float),
+        axis_encoder_counts_per_deg: np.ndarray = np.array(
+            [3.6e6, 3.6e6, 3.6e6, 3.6e6, 3.6e6], dtype=float
+        ),
+        motor_encoder_counts_per_deg: np.ndarray = np.array(
+            [3.6e5, 3.6e5, 3.6e5, 3.6e5, 3.6e5], dtype=float
+        ),
+        motor_axis_ratio: np.ndarray = np.array([100, 100, 100, 100, 100], dtype=float),
+        torque_per_accel: np.ndarray = np.array([1, 1, 1, 1, 1], dtype=float),
+        nsettle: int = 2,
+        limit_overtravel: int = 1,
+    ) -> None:
         """Set configuration.
 
         Parameters
@@ -254,23 +287,6 @@ class ATMCSCsc(salobj.BaseCsc):
             If limit_overtravel < 0.
         """
 
-        def convert_values(name, values, nval):
-            out = np.array(values, dtype=float)
-            if out.shape != (nval,):
-                raise salobj.ExpectedError(
-                    f"Could not format {name}={values!r} as {nval} floats"
-                )
-            return out
-
-        # convert and check all values first,
-        # so nothing changes if any input is invalid
-        min_commanded_position = convert_values(
-            "min_commanded_position", min_commanded_position, 5
-        )
-        max_commanded_position = convert_values(
-            "max_commanded_position", max_commanded_position, 5
-        )
-        start_position = convert_values("start_position", start_position, 5)
         for axis in Axis:
             if max_commanded_position[axis] < min_commanded_position[axis]:
                 raise salobj.ExpectedError(
@@ -288,14 +304,6 @@ class ATMCSCsc(salobj.BaseCsc):
                     f"start_position[{axis}]={start_position[axis]}"
                 )
 
-        min_limit_switch_position = convert_values(
-            "min_limit_switch_position", min_limit_switch_position, 5
-        )
-        max_limit_switch_position = convert_values(
-            "max_limit_switch_position", max_limit_switch_position, 5
-        )
-        max_velocity = convert_values("max_velocity", max_velocity, 5)
-        max_acceleration = convert_values("max_acceleration", max_acceleration, 5)
         if max_velocity.min() <= 0:
             raise salobj.ExpectedError(
                 f"max_velocity={max_velocity}; all values must be positive"
@@ -304,16 +312,6 @@ class ATMCSCsc(salobj.BaseCsc):
             raise salobj.ExpectedError(
                 f"max_acceleration={max_acceleration}; all values must be positive"
             )
-        topple_azimuth = convert_values("topple_azimuth", topple_azimuth, 2)
-        m3_port_positions = convert_values("m3_port_positions", m3_port_positions, 3)
-        axis_encoder_counts_per_deg = convert_values(
-            "axis_encoder_counts_per_deg", axis_encoder_counts_per_deg, 5
-        )
-        motor_encoder_counts_per_deg = convert_values(
-            "motor_encoder_counts_per_deg", motor_encoder_counts_per_deg, 5
-        )
-        motor_axis_ratio = convert_values("motor_axis_ratio", motor_axis_ratio, 5)
-        torque_per_accel = convert_values("torque_per_accel", torque_per_accel, 5)
         if limit_overtravel < 0:
             raise salobj.ExpectedError(
                 f"limit_overtravel={limit_overtravel} must be >= 0"
@@ -332,8 +330,6 @@ class ATMCSCsc(salobj.BaseCsc):
         self.motor_axis_ratio = motor_axis_ratio
         self.torque_per_accel = torque_per_accel
         self.nsettle = nsettle
-        # allowed position error for M3 to be considered in position (deg)
-        self.m3tolerance = 1e-5
         self.limit_overtravel = limit_overtravel
 
         tai = utils.current_tai()
@@ -359,7 +355,7 @@ class ATMCSCsc(salobj.BaseCsc):
             force_output=True,
         )
 
-    async def do_startTracking(self, data):
+    async def do_startTracking(self, data: salobj.BaseMsgType) -> None:
         self.assert_enabled("startTracking")
         if not self.evt_m3InPosition.data.inPosition:
             raise salobj.ExpectedError(
@@ -371,7 +367,7 @@ class ATMCSCsc(salobj.BaseCsc):
         await self.update_events()
         self._set_tracking_timer(restart=True)
 
-    async def do_trackTarget(self, data):
+    async def do_trackTarget(self, data: salobj.BaseMsgType) -> None:
         self.assert_enabled("trackTarget")
         if not self._tracking_enabled:
             raise salobj.ExpectedError("Cannot trackTarget until tracking is enabled")
@@ -439,7 +435,7 @@ class ATMCSCsc(salobj.BaseCsc):
 
         self._set_tracking_timer(restart=True)
 
-    def _set_tracking_timer(self, restart):
+    def _set_tracking_timer(self, restart: bool) -> None:
         """Restart or stop the tracking timer.
 
         Parameters
@@ -451,7 +447,7 @@ class ATMCSCsc(salobj.BaseCsc):
         if restart:
             self._kill_tracking_timer = asyncio.ensure_future(self.kill_tracking())
 
-    async def do_setInstrumentPort(self, data):
+    async def do_setInstrumentPort(self, data: salobj.BaseMsgType) -> None:
         self.assert_enabled("setInstrumentPort")
         if self._tracking_enabled:
             raise salobj.ExpectedError(
@@ -483,7 +479,7 @@ class ATMCSCsc(salobj.BaseCsc):
         self._axis_enabled[Axis.NA2] = False
         await self.update_events()
 
-    async def do_stopTracking(self, data):
+    async def do_stopTracking(self, data: salobj.BaseMsgType) -> None:
         self.assert_enabled("stopTracking")
         if not self._stop_tracking_task.done():
             raise salobj.ExpectedError("Already stopping")
@@ -495,7 +491,7 @@ class ATMCSCsc(salobj.BaseCsc):
         self._stop_tracking_task = asyncio.ensure_future(self._finish_stop_tracking())
         await self.update_events()
 
-    async def kill_tracking(self):
+    async def kill_tracking(self) -> None:
         """Wait ``self.max_tracking_interval`` seconds and disable tracking.
 
         Intended for use by `do_trackTarget` to abort tracking
@@ -506,7 +502,7 @@ class ATMCSCsc(salobj.BaseCsc):
             code=2, report=f"trackTarget not seen in {self.max_tracking_interval} sec"
         )
 
-    async def disable_all_drives(self):
+    async def disable_all_drives(self) -> None:
         """Stop all drives, disable them and put on brakes."""
         self._tracking_enabled = False
         already_stopped = True
@@ -525,7 +521,7 @@ class ATMCSCsc(salobj.BaseCsc):
             )
         await self.update_events()
 
-    async def _finish_disable_all_drives(self):
+    async def _finish_disable_all_drives(self) -> None:
         """Wait for the main axes to stop."""
         end_times = [actuator.path[-1].tai for actuator in self.actuators]
         max_end_time = max(end_times)
@@ -537,7 +533,7 @@ class ATMCSCsc(salobj.BaseCsc):
             self._axis_enabled[axis] = False
         asyncio.ensure_future(self._run_update_events())
 
-    async def _finish_stop_tracking(self):
+    async def _finish_stop_tracking(self) -> None:
         """Wait for the main axes to stop."""
         end_times = [self.actuators[axis].path[-1].tai for axis in MainAxes]
         max_end_time = max(end_times)
@@ -546,7 +542,7 @@ class ATMCSCsc(salobj.BaseCsc):
             await asyncio.sleep(dt)
         asyncio.ensure_future(self._run_update_events())
 
-    async def _run_update_events(self):
+    async def _run_update_events(self) -> None:
         """Sleep then run update_events.
 
         Used to call update_events shortly after the _disable_all_drives_task
@@ -555,7 +551,7 @@ class ATMCSCsc(salobj.BaseCsc):
         await asyncio.sleep(0)
         await self.update_events()
 
-    def m3_port_rot(self, tai):
+    def m3_port_rot(self, tai: float) -> tuple[int | None, int | None]:
         """Return exit port and rotator axis.
 
         Parameters
@@ -580,7 +576,7 @@ class ATMCSCsc(salobj.BaseCsc):
                 return (exit_port, rot_axis)
         return (None, None)
 
-    def m3_in_position(self, tai):
+    def m3_in_position(self, tai: float) -> bool:
         """Is the M3 actuator in position?
 
         Parameters
@@ -596,9 +592,9 @@ class ATMCSCsc(salobj.BaseCsc):
         m3position_difference = abs(m3target_position - m3current.position)
         return m3position_difference < self.m3tolerance
 
-    async def handle_summary_state(self):
+    async def handle_summary_state(self) -> None:
         if self.summary_state == salobj.State.ENABLED:
-            axes_to_enable = set((Axis.Elevation, Axis.Azimuth))
+            axes_to_enable: set[int] = {Axis.Elevation, Axis.Azimuth}
             tai = utils.current_tai()
             rot_axis = self.m3_port_rot(tai)[1]
             if rot_axis is not None:
@@ -615,7 +611,9 @@ class ATMCSCsc(salobj.BaseCsc):
         else:
             self._events_and_telemetry_task.cancel()
 
-    async def set_write_event(self, evt_name, **kwargs):
+    async def set_write_event(
+        self, evt_name: str, **kwargs: Any
+    ) -> salobj.topics.SetWriteResult:
         """Call await ``ControllerEvent.set_write`` for an event
         specified by name.
 
@@ -634,7 +632,7 @@ class ATMCSCsc(salobj.BaseCsc):
         evt = getattr(self, f"evt_{evt_name}")
         return await evt.set_write(**kwargs)
 
-    async def update_events(self):
+    async def update_events(self) -> None:
         """Update most events and output those that have changed.
 
         Notes
@@ -691,7 +689,7 @@ class ATMCSCsc(salobj.BaseCsc):
                 dtype=float,
             )
             m3actuator = self.actuators[Axis.M3]
-            axes_in_use = set([Axis.Elevation, Axis.Azimuth, Axis.M3])
+            axes_in_use: set[int] = {Axis.Elevation, Axis.Azimuth, Axis.M3}
 
             # Handle M3 actuator; set_target needs to be called to transition
             # from slewing to tracking, and that is done here for M3
@@ -852,7 +850,7 @@ class ATMCSCsc(salobj.BaseCsc):
             print(f"update_events failed: {e}")
             raise
 
-    async def update_telemetry(self):
+    async def update_telemetry(self) -> None:
         """Output all telemetry topics."""
         try:
             nitems = len(self.tel_mount_AzEl_Encoders.data.elevationEncoder1Raw)
@@ -1030,7 +1028,7 @@ class ATMCSCsc(salobj.BaseCsc):
             print(f"update_telemetry failed: {e}")
             raise
 
-    async def events_and_telemetry_loop(self):
+    async def events_and_telemetry_loop(self) -> None:
         """Output telemetry and events that have changed
 
         Notes
@@ -1058,6 +1056,6 @@ class ATMCSCsc(salobj.BaseCsc):
             await asyncio.sleep(self._telemetry_interval / self._events_per_telemetry)
 
 
-def run_atmcs_simulator():
+def run_atmcs_simulator() -> None:
     """Run the ATMCS CSC simulator."""
     asyncio.run(ATMCSCsc.amain(index=None))

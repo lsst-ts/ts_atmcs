@@ -19,17 +19,36 @@
 # You should have received a copy of the GNU General Public License
 
 import asyncio
+import pathlib
 import unittest
+from typing import Any
 
+import numpy as np
 import pytest
 from lsst.ts import atmcssimulator, salobj, simactuators, utils
 from lsst.ts.idl.enums.ATMCS import AtMountState, M3ExitPort, M3State
 
-STD_TIMEOUT = 10  # standard timeout, seconds
+STD_TIMEOUT = 10.0  # standard timeout, seconds
+
+FIVE_CTRL_EVT = tuple[
+    salobj.topics.ControllerEvent,
+    salobj.topics.ControllerEvent,
+    salobj.topics.ControllerEvent,
+    salobj.topics.ControllerEvent,
+    salobj.topics.ControllerEvent,
+]
+SIX_CTRL_EVT = tuple[
+    salobj.topics.ControllerEvent,
+    salobj.topics.ControllerEvent,
+    salobj.topics.ControllerEvent,
+    salobj.topics.ControllerEvent,
+    salobj.topics.ControllerEvent,
+    salobj.topics.ControllerEvent,
+]
 
 
 class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         super().setUp()
         self.axis_names = (  # names of axes for trackTarget command
             "elevation",
@@ -39,7 +58,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         )
 
     @property
-    def brake_events(self):
+    def brake_events(self) -> FIVE_CTRL_EVT:
         return (
             self.remote.evt_azimuthBrake1,
             self.remote.evt_azimuthBrake2,
@@ -49,7 +68,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         )
 
     @property
-    def drive_status_events(self):
+    def drive_status_events(self) -> SIX_CTRL_EVT:
         return (
             self.remote.evt_elevationDriveStatus,
             self.remote.evt_azimuthDrive1Status,
@@ -60,7 +79,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         )
 
     @property
-    def in_position_events(self):
+    def in_position_events(self) -> FIVE_CTRL_EVT:
         return (
             self.remote.evt_elevationInPosition,
             self.remote.evt_azimuthInPosition,
@@ -69,10 +88,17 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             self.remote.evt_m3InPosition,
         )
 
-    def basic_make_csc(self, initial_state, config_dir, simulation_mode):
+    def basic_make_csc(
+        self,
+        initial_state: salobj.State | int,
+        config_dir: str | pathlib.Path | None,
+        index: int = 1,
+        simulation_mode: int = 1,
+        override: str = "",
+    ) -> atmcssimulator.ATMCSCsc:
         return atmcssimulator.ATMCSCsc(initial_state=initial_state)
 
-    async def fault_to_enabled(self):
+    async def fault_to_enabled(self) -> None:
         """Check that the CSC is in FAULT state and enable it.
 
         Assumes that the FAULT state has not yet been read from the remote.
@@ -88,7 +114,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         await self.remote.cmd_enable.start(timeout=STD_TIMEOUT)
         await self.assert_next_summary_state(salobj.State.ENABLED)
 
-    async def test_initial_info(self):
+    async def test_initial_info(self) -> None:
         """Check that all events and telemetry are output at startup
 
         except the m3PortSelected event
@@ -122,22 +148,36 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                     await tel.next(flush=False, timeout=timeout)
                 timeout = 0.1
 
-    async def test_invalid_track_target(self):
+    async def test_invalid_track_target(self) -> None:
         """Test all reasons trackTarget may be rejected."""
         async with self.make_csc(initial_state=salobj.State.ENABLED):
             # Get the initial summary state, so `fault_to_enabled` sees FAULT.
             await self.assert_next_summary_state(salobj.State.ENABLED)
 
-            min_commanded_position = (5, -270, -165, -165, 0)
-            max_commanded_position = (90, 270, 165, 165, 180)
-            max_velocity = (100,) * 5
+            min_commanded_position = np.array([5, -270, -165, -165, 0], dtype=float)
+            max_commanded_position = np.array([90, 270, 165, 165, 180], dtype=float)
+            max_velocity = np.array(
+                [
+                    100,
+                ]
+                * 5,
+                dtype=float,
+            )
             await self.csc.configure(
                 min_commanded_position=min_commanded_position,
                 max_commanded_position=max_commanded_position,
                 max_velocity=max_velocity,
-                max_acceleration=(200,) * 5,
+                max_acceleration=np.array(
+                    [
+                        200,
+                    ]
+                    * 5,
+                    dtype=float,
+                ),
             )
-            good_target_kwargs = dict((name, 0) for name in self.axis_names)
+            good_target_kwargs: dict[str, float | int] = dict(
+                (name, 0) for name in self.axis_names
+            )
             # elevation does not have 0 in its valid range
             good_target_kwargs[self.axis_names[0]] = min_commanded_position[0]
             # zero velocity as well
@@ -263,7 +303,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
             await self.fault_to_enabled()
 
-    async def test_brake_and_drive_status_events(self):
+    async def test_brake_and_drive_status_events(self) -> None:
         async with self.make_csc(initial_state=salobj.State.STANDBY):
             # Axes start disabled.
             for event in self.brake_events:
@@ -308,7 +348,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                     continue
                 await self.assert_next_sample(event, enable=False)
 
-    async def test_standard_state_transitions(self):
+    async def test_standard_state_transitions(self) -> None:
         async with self.make_csc(initial_state=salobj.State.STANDBY):
             await self.check_standard_state_transitions(
                 enabled_commands=(
@@ -319,7 +359,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 )
             )
 
-    async def test_set_instrument_port(self):
+    async def test_set_instrument_port(self) -> None:
         async with self.make_csc(initial_state=salobj.State.STANDBY):
             # Change states manually to make the test compatible
             # with both ts_salobj 6.0 and 6.1: 6.0 does not output
@@ -330,8 +370,20 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             # ``initial_state=salobj.State.ENABLED`` above
             await salobj.set_summary_state(self.remote, state=salobj.State.ENABLED)
             await self.csc.configure(
-                max_velocity=(100,) * 5,
-                max_acceleration=(200,) * 5,
+                max_velocity=np.array(
+                    [
+                        100,
+                    ]
+                    * 5,
+                    dtype=float,
+                ),
+                max_acceleration=np.array(
+                    [
+                        200,
+                    ]
+                    * 5,
+                    dtype=float,
+                ),
             )
 
             await self.assert_next_sample(
@@ -421,16 +473,28 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             data = self.remote.evt_nasmyth1DriveStatus.get()
             assert not data.enable
 
-    async def test_bin_script(self):
+    async def test_bin_script(self) -> None:
         await self.check_bin_script(
             name="ATMCS", index=None, exe_name="run_atmcs_simulator"
         )
 
-    async def test_track(self):
+    async def test_track(self) -> None:
         async with self.make_csc(initial_state=salobj.State.ENABLED):
             await self.csc.configure(
-                max_velocity=(100,) * 5,
-                max_acceleration=(200,) * 5,
+                max_velocity=np.array(
+                    [
+                        100,
+                    ]
+                    * 5,
+                    dtype=float,
+                ),
+                max_acceleration=np.array(
+                    [
+                        200,
+                    ]
+                    * 5,
+                    dtype=float,
+                ),
             )
 
             await self.assert_next_sample(
@@ -506,7 +570,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
             await self.remote.cmd_stopTracking.start(timeout=1)
 
-    async def test_late_track_target(self):
+    async def test_late_track_target(self) -> None:
         # Use a short tracking interval so the test runs quickly.
         max_tracking_interval = 0.2
         async with self.make_csc(initial_state=salobj.State.ENABLED):
@@ -515,8 +579,20 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
             await self.csc.configure(
                 max_tracking_interval=max_tracking_interval,
-                max_velocity=(100,) * 5,
-                max_acceleration=(200,) * 5,
+                max_velocity=np.array(
+                    [
+                        100,
+                    ]
+                    * 5,
+                    dtype=float,
+                ),
+                max_acceleration=np.array(
+                    [
+                        200,
+                    ]
+                    * 5,
+                    dtype=float,
+                ),
             )
             await self.assert_next_sample(
                 self.remote.evt_atMountState, state=AtMountState.TRACKINGDISABLED
@@ -561,7 +637,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 self.remote.evt_atMountState, state=AtMountState.TRACKINGDISABLED
             )
 
-    async def test_stop_tracking_while_slewing(self):
+    async def test_stop_tracking_while_slewing(self) -> None:
         """Call stopTracking while tracking, before a slew is done."""
         async with self.make_csc(initial_state=salobj.State.ENABLED):
             await self.assert_next_sample(
@@ -613,7 +689,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             for actuator in self.csc.actuators:
                 assert actuator.kind() == actuator.Kind.Stopped
 
-    async def test_disable_while_slewing(self):
+    async def test_disable_while_slewing(self) -> None:
         """Call disable while tracking, before a slew is done."""
         async with self.make_csc(initial_state=salobj.State.ENABLED):
             state = await self.remote.evt_summaryState.next(flush=False, timeout=5)
@@ -660,7 +736,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 self.remote.evt_atMountState, state=AtMountState.TRACKINGDISABLED
             )
 
-    def assertTargetsAlmostEqual(self, target1, target2):
+    def assertTargetsAlmostEqual(self, target1: Any, target2: Any) -> None:
         """Assert two targets are approximately equal.
 
         Parameters
@@ -683,7 +759,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         ):
             assert getattr(target1, field) == pytest.approx(getattr(target2, field))
 
-    def compute_track_target_kwargs(self, tai, path_dict, trackId):
+    def compute_track_target_kwargs(
+        self, tai: float, path_dict: dict[str, Any], trackId: int
+    ) -> dict[str, Any]:
         """Compute keyword arguments for the trackTarget command.
 
         Parameters
@@ -702,7 +780,3 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             target_kwargs[axis_name] = segment.position
             target_kwargs[f"{axis_name}Velocity"] = segment.velocity
         return target_kwargs
-
-
-if __name__ == "__main__":
-    unittest.main()
