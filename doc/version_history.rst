@@ -6,10 +6,11 @@
 Version History
 ###############
 
-v1.5.3
+v2.0.0
 ------
 
 * Add JSON schemas for command, event and telemetry exchange via TCP/IP.
+* Add MTC simulator and simulator server for testing the TCP/IP interaction with the real ATMCS server.
 
 Requires:
 
