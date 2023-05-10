@@ -19,13 +19,4 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-try:
-    from .version import *
-except ImportError:
-    __version__ = "?"
-
-from .enums import *
-from .mcs_csc import *
-from .mcs_server_simulator import *
-from .mcs_simulator import *
-from .schemas import *
+from .registry import *

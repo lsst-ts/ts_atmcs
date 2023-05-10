@@ -19,13 +19,18 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-try:
-    from .version import *
-except ImportError:
-    __version__ = "?"
+__all__ = ["registry", "JSON_SCHEMA_EXTENSION"]
 
-from .enums import *
-from .mcs_csc import *
-from .mcs_server_simulator import *
-from .mcs_simulator import *
-from .schemas import *
+import json
+import pathlib
+import typing
+
+JSON_SCHEMA_EXTENSION = ".json"
+
+registry: dict[str, typing.Any] = {}
+schema_dir = pathlib.Path(__file__).parent
+for file in list(schema_dir.glob(f"*{JSON_SCHEMA_EXTENSION}")):
+    schema_name = file.name.replace(JSON_SCHEMA_EXTENSION, "")
+    with open(file, "r") as f:
+        schema = json.load(f)
+        registry[schema_name] = schema
