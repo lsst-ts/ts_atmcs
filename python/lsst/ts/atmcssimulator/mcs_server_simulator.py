@@ -19,7 +19,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import asyncio
 import logging
 import typing
 
@@ -79,45 +78,6 @@ class McsServerSimulator(tcpip.OneClientReadLoopServer):
             **kwargs,
         )
         self.dispatch_callback = dispatch_callback
-        self.start_event = asyncio.Event()
-
-    async def start(self, **kwargs: typing.Any) -> None:
-        """Start the TCP/IP server.
-
-        This is called automatically by the constructor,
-        and is not intended to be called by the user.
-        It is a public method so that subclasses can override it.
-
-        After calling the super start method, an async event is set so clients
-        can be ensured that the server has been started.
-
-        Parameters
-        ----------
-        **kwargs : `dict` [`str`, `typing.Any`]
-            Additional keyword arguments for `asyncio.start_server`,
-            beyond host and port.
-
-        Raises
-        ------
-        `RuntimeError`
-            If start has already been called and has successfully constructed
-            a server.
-        """
-        await super().start(**kwargs)
-        self.start_event.set()
-
-    async def close(self) -> None:
-        """Close socket server and client socket, and set done_task done.
-
-        Call connect_callback if a client was connected.
-
-        Always safe to call.
-
-        After calling the super stop method, an async event is cleared so
-        clients can be ensured that the server has been closed.
-        """
-        await super().close()
-        self.start_event.clear()
 
     async def read_and_dispatch(self) -> None:
         data = await self.read_json()

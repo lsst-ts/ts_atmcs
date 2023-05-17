@@ -27,7 +27,7 @@ test:
     - ts-idl {{ idl_version }}
     - ts-salobj {{ salobj_version }}
     - ts-simactuators
-    - ts-tcpip
+    - ts-tcpip >=1.1.1
     - ts-utils
   source_files:
     - bin
@@ -53,5 +53,5 @@ requirements:
     - ts-idl
     - ts-salobj
     - ts-simactuators
-    - ts-tcpip
+    - ts-tcpip >=1.1.1
     - ts-utils
