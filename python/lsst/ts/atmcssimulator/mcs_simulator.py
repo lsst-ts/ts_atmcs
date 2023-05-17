@@ -38,6 +38,8 @@ CMD_ITEMS_TO_IGNORE = frozenset({CommandKey.ID, CommandKey.VALUE})
 
 
 class McsSimulator:
+    """Simulate the ATMCS system."""
+
     def __init__(self) -> None:
         self.log = logging.getLogger(type(self).__name__)
         self.cmd_evt_server = McsServerSimulator(

@@ -15,6 +15,7 @@ v2.0.0
 Requires:
 
 * ts_salobj 7.1
+* ts_tcpip 1.1
 * ts_utils 1
 * ts_simactuators 2
 * ts_idl 2
