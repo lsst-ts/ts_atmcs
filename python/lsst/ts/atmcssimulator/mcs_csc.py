@@ -19,10 +19,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-__all__ = ["ATMCSCsc", "Axis", "MainAxes", "run_atmcs_simulator"]
+__all__ = ["ATMCSCsc", "run_atmcs_simulator"]
 
 import asyncio
-import enum
 from typing import Any
 
 import numpy as np
@@ -30,17 +29,7 @@ from lsst.ts import salobj, simactuators, utils
 from lsst.ts.idl.enums.ATMCS import AtMountState, M3ExitPort, M3State
 
 from . import __version__
-
-
-class Axis(enum.IntEnum):
-    Elevation = 0
-    Azimuth = 1
-    NA1 = 2
-    NA2 = 3
-    M3 = 4
-
-
-MainAxes = (Axis.Elevation, Axis.Azimuth, Axis.NA1, Axis.NA2)
+from .enums import Axis, MainAxes
 
 
 class ATMCSCsc(salobj.BaseCsc):

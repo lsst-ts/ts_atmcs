@@ -19,19 +19,27 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from enum import Enum
+__all__ = ["Ack", "Axis", "CommandKey", "Event", "MainAxes", "Telemetry"]
 
-__all__ = ["Ack", "CommandKey"]
+import enum
 
 
-class Ack(str, Enum):
+class Ack(str, enum.Enum):
     ACK = "ack"
     FAIL = "fail"
     NOACK = "noack"
     SUCCESS = "success"
 
 
-class CommandKey(str, Enum):
+class Axis(enum.IntEnum):
+    Elevation = 0
+    Azimuth = 1
+    NA1 = 2
+    NA2 = 3
+    M3 = 4
+
+
+class CommandKey(str, enum.Enum):
     AZIMUTH = "azimuth"
     AZIMUTH_VELOCITY = "azimuthVelocity"
     ELEVATION = "elevation"
@@ -48,3 +56,56 @@ class CommandKey(str, Enum):
     TRACK_ID = "trackId"
     TRACK_SYS = "tracksys"
     VALUE = "value"
+
+
+class Event(str, enum.Enum):
+    ALLAXESINPOSITION = "allAxesInPosition"
+    ATMOUNTSTATE = "atMountState"
+    AZIMUTHBRAKE1 = "azimuthBrake1"
+    AZIMUTHBRAKE2 = "azimuthBrake2"
+    AZIMUTHDRIVE1STATUS = "azimuthDrive1Status"
+    AZIMUTHDRIVE2STATUS = "azimuthDrive2Status"
+    AZIMUTHINPOSITION = "azimuthInPosition"
+    AZIMUTHLIMITSWITCHCCW = "azimuthLimitSwitchCCW"
+    AZIMUTHLIMITSWITCHCW = "azimuthLimitSwitchCW"
+    AZIMUTHTOPPLEBLOCKCCW = "azimuthToppleBlockCCW"
+    AZIMUTHTOPPLEBLOCKCW = "azimuthToppleBlockCW"
+    DETAILEDSTATE = "detailedState"
+    ELEVATIONBRAKE = "elevationBrake"
+    ELEVATIONDRIVESTATUS = "elevationDriveStatus"
+    ELEVATIONINPOSITION = "elevationInPosition"
+    ELEVATIONLIMITSWITCHLOWER = "elevationLimitSwitchLower"
+    ELEVATIONLIMITSWITCHUPPER = "elevationLimitSwitchUpper"
+    M3DRIVESTATUS = "m3DriveStatus"
+    M3INPOSITION = "m3InPosition"
+    M3PORTSELECTED = "m3PortSelected"
+    M3ROTATORDETENTSWITCHES = "m3RotatorDetentSwitches"
+    M3ROTATORLIMITSWITCHCCW = "m3RotatorLimitSwitchCCW"
+    M3ROTATORLIMITSWITCHCW = "m3RotatorLimitSwitchCW"
+    M3STATE = "m3State"
+    NASMYTH1BRAKE = "nasmyth1Brake"
+    NASMYTH1DRIVESTATUS = "nasmyth1DriveStatus"
+    NASMYTH1LIMITSWITCHCCW = "nasmyth1LimitSwitchCCW"
+    NASMYTH1LIMITSWITCHCW = "nasmyth1LimitSwitchCW"
+    NASMYTH1ROTATORINPOSITION = "nasmyth1RotatorInPosition"
+    NASMYTH2BRAKE = "nasmyth2Brake"
+    NASMYTH2DRIVESTATUS = "nasmyth2DriveStatus"
+    NASMYTH2LIMITSWITCHCCW = "nasmyth2LimitSwitchCCW"
+    NASMYTH2LIMITSWITCHCW = "nasmyth2LimitSwitchCW"
+    NASMYTH2ROTATORINPOSITION = "nasmyth2RotatorInPosition"
+    POSITIONLIMITS = "positionLimits"
+    TARGET = "target"
+
+
+MainAxes = (Axis.Elevation, Axis.Azimuth, Axis.NA1, Axis.NA2)
+
+
+class Telemetry(str, enum.Enum):
+    AZEL_MOTOR_MOUNT_ENCODERS = "azEl_mountMotorEncoders"
+    MEASURED_MOTOR_VELOCITY = "measuredMotorVelocity"
+    MEASURED_TORQUE = "measuredTorque"
+    MOUNT_AZEL_ENCODERS = "mount_AzEl_Encoders"
+    MOUNT_NASMYTH_ENCODERS = "mount_Nasmyth_Encoders"
+    NASMYTH_M3_MOUNT_MOTOR_ENCODERS = "nasymth_m3_mountMotorEncoders"
+    TORQUE_DEMAND = "torqueDemand"
+    TRAJECTORY = "trajectory"
