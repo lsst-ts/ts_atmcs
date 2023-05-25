@@ -69,6 +69,7 @@ class ATMCSCsc(salobj.BaseCsc):
     """
 
     valid_simulation_modes = [1]
+    # TODO DM-39357 Remove these lines.
     # Append "-sim" to avoid confusion with the real ATMCS CSC.
     version = f"{__version__}-sim"
 
