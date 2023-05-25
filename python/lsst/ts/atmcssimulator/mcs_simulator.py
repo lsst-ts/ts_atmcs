@@ -46,7 +46,7 @@ class McsSimulator:
 
     def __init__(self, csc: ATMCSCsc) -> None:
         self.log = logging.getLogger(type(self).__name__)
-        # TODO DM-38912 Send "port"" via configuration.
+        # TODO DM-38912 Send "port" via configuration.
         self.cmd_evt_server = McsServerSimulator(
             host=tcpip.LOCALHOST_IPV4,
             port=5000,
@@ -55,7 +55,7 @@ class McsSimulator:
             connect_callback=self.connect_callback,
             name="CmdEvtMcsServer",
         )
-        # TODO DM-38912 Send "port"" via configuration.
+        # TODO DM-38912 Send "port" via configuration.
         self.telemetry_server = McsServerSimulator(
             host=tcpip.LOCALHOST_IPV4,
             port=6000,
@@ -82,6 +82,8 @@ class McsSimulator:
         self._stop_tracking_task = utils.make_done_future()
         # Task that runs while axes are halting before being disabled.
         self._disable_all_drives_task = utils.make_done_future()
+        # Timer to kill tracking if trackTarget doesn't arrive in time.
+        self._kill_tracking_timer = utils.make_done_future()
 
         # Dict of M3ExitPort (the instrument port M3 points to): tuple of:
         # * index of self.m3_port_positions: the M3 position for this port
@@ -399,25 +401,139 @@ class McsSimulator:
     async def set_instrument_port(
         self, sequence_id: int, **kwargs: dict[str, typing.Any]
     ) -> None:
-        # TODO DM-39012: Add simulator code.
+        if CommandKey.PORT not in kwargs or self._tracking_enabled:
+            await self.write_fail_response(sequence_id=sequence_id)
+            return
+        port = kwargs[CommandKey.PORT]
+        try:
+            m3_port_positions_ind = self._port_info_dict[port][0]
+        except KeyError:
+            await self.write_fail_response(sequence_id=sequence_id)
+            return
+        try:
+            m3_port_positions = self.m3_port_positions[m3_port_positions_ind]
+        except KeyError:
+            await self.write_fail_response(sequence_id=sequence_id)
+            return
+        await self.write_evt(evt_id=Event.M3PORTSELECTED, selected=port)
+        m3actuator = self.actuators[Axis.M3]
+        m3_in_position = self.m3_in_position(utils.current_tai())
+        if m3actuator.target.position == m3_port_positions and m3_in_position:
+            # already there; don't do anything
+            pass
+        else:
+            self.actuators[Axis.M3].set_target(
+                tai=utils.current_tai(), position=m3_port_positions, velocity=0
+            )
+            self._axis_enabled[Axis.NA1] = False
+            self._axis_enabled[Axis.NA2] = False
+            await self.update_events()
         await self.write_success_response(sequence_id=sequence_id)
 
     async def start_tracking(
         self, sequence_id: int, **kwargs: dict[str, typing.Any]
     ) -> None:
-        # TODO DM-39012: Add simulator code.
+        m3_in_position = self.m3_in_position(utils.current_tai())
+        if not m3_in_position:
+            await self.write_fail_response(sequence_id=sequence_id)
+            return
+        if not self._stop_tracking_task.done():
+            await self.write_fail_response(sequence_id=sequence_id)
+            return
+        self._tracking_enabled = True
+        await self.update_events()
+        # TODO Not sure what to do here. The poriginal code in the CSC set the
+        #  CSC to FAULT after a certain period was passed but there is no way
+        #  to do that with the TCP/IP infrastructure.
+        # self._set_tracking_timer(restart=True)
         await self.write_success_response(sequence_id=sequence_id)
 
     async def stop_tracking(
         self, sequence_id: int, **kwargs: dict[str, typing.Any]
     ) -> None:
-        # TODO DM-39012: Add simulator code.
+        if not self._stop_tracking_task.done():
+            await self.write_fail_response(sequence_id=sequence_id)
+            return
+
+        # TODO Not sure what to do here. The poriginal code in the CSC set the
+        #  CSC to FAULT after a certain period was passed but there is no way
+        #  to do that with the TCP/IP infrastructure.
+        # self._set_tracking_timer(restart=False)
+        self._tracking_enabled = False
+        for axis in MainAxes:
+            self.actuators[axis].stop()
+        self._stop_tracking_task.cancel()
+        self._stop_tracking_task = asyncio.ensure_future(self._finish_stop_tracking())
+        await self.update_events()
         await self.write_success_response(sequence_id=sequence_id)
 
     async def track_target(
         self, sequence_id: int, **kwargs: dict[str, typing.Any]
     ) -> None:
-        # TODO DM-39012: Add simulator code.
+        if not self._tracking_enabled:
+            await self.write_fail_response(sequence_id=sequence_id)
+            return
+        try:
+            position = np.array(
+                [
+                    kwargs["elevation"],
+                    kwargs["azimuth"],
+                    kwargs["nasmyth1RotatorAngle"],
+                    kwargs["nasmyth2RotatorAngle"],
+                ],
+                dtype=float,
+            )
+            velocity = np.array(
+                [
+                    kwargs["elevationVelocity"],
+                    kwargs["azimuthVelocity"],
+                    kwargs["nasmyth1RotatorAngleVelocity"],
+                    kwargs["nasmyth2RotatorAngleVelocity"],
+                ],
+                dtype=float,
+            )
+            dt = utils.current_tai() - kwargs["taiTime"]
+            current_position = position + dt * velocity
+            if np.any(current_position < self.min_commanded_position[0:4]) or np.any(
+                current_position > self.max_commanded_position[0:4]
+            ):
+                await self.write_fail_response(sequence_id=sequence_id)
+                return
+            if np.any(np.abs(velocity) > self.max_velocity[0:4]):
+                await self.write_fail_response(sequence_id=sequence_id)
+                return
+        except Exception as e:
+            await self.write_fail_response(sequence_id=sequence_id)
+            return
+
+        for i in range(4):
+            self.actuators[i].set_target(
+                tai=kwargs["taiTime"], position=position[i], velocity=velocity[i]
+            )
+
+        target_fields = (
+            CommandKey.AZIMUTH,
+            CommandKey.AZIMUTH_VELOCITY,
+            CommandKey.ELEVATION,
+            CommandKey.ELEVATION_VELOCITY,
+            CommandKey.NASMYTH1_ROTATOR_ANGLE,
+            CommandKey.NASMYTH1_ROTATOR_ANGLE_VELOCITY,
+            CommandKey.NASMYTH2_ROTATOR_ANGLE,
+            CommandKey.NASMYTH2_ROTATOR_ANGLE_VELOCITY,
+            CommandKey.TAI_TIME,
+            CommandKey.TRACK_ID,
+            CommandKey.TRACK_SYS,
+            CommandKey.RA_DE_SYS,
+        )
+        evt_kwargs = {k: v for k, v in kwargs.items() if k in target_fields}
+        await self.write_evt(evt_id=Event.TARGET, **evt_kwargs)
+        self.csc.tel_mount_AzEl_Encoders.set(trackId=kwargs["trackId"])
+        self.csc.tel_mount_Nasmyth_Encoders.set(trackId=kwargs["trackId"])
+
+        # TODO Not sure what to do here. The poriginal code in the CSC set the
+        #  CSC to FAULT after a certain period was passed but there is no way
+        #  to do that with the TCP/IP infrastructure.
+        # self._set_tracking_timer(restart=True)
         await self.write_success_response(sequence_id=sequence_id)
 
     def m3_port_rot(self, tai: float) -> tuple[int | None, int | None]:
@@ -686,7 +802,7 @@ class McsSimulator:
     async def update_telemetry(self) -> None:
         """Output all telemetry data messages."""
         try:
-            # TODO DM-38912 Send "nitems"" via configuration.
+            # TODO DM-38912 Send "nitems" via configuration.
             nitems = 100
             curr_time = utils.current_tai()
 
@@ -932,6 +1048,14 @@ class McsSimulator:
         items = self.get_items_from_data(data)
         items["id"] = tel_id
         await self.telemetry_server.write_json(data={**items})
+
+    async def _finish_stop_tracking(self) -> None:
+        """Wait for the main axes to stop."""
+        end_times = [self.actuators[axis].path[-1].tai for axis in MainAxes]
+        max_end_time = max(end_times)
+        dt = 0.1 + max_end_time - utils.current_tai()
+        if dt > 0:
+            await asyncio.sleep(dt)
 
     async def events_and_telemetry_loop(self) -> None:
         """Output telemetry and events that have changed

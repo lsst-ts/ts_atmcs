@@ -26,10 +26,20 @@ import typing
 import unittest
 
 import jsonschema
-from lsst.ts import atmcssimulator, tcpip
+from lsst.ts import atmcssimulator, tcpip, utils
 
 # Standard timeout in seconds.
 TIMEOUT = 2
+
+EVENTS_NOT_TO_EXPECT = {
+    atmcssimulator.Event.DETAILEDSTATE,
+    atmcssimulator.Event.M3PORTSELECTED,
+    atmcssimulator.Event.POSITIONLIMITS,
+    atmcssimulator.Event.TARGET,
+}
+EVENTS_TO_EXPECT = {
+    evt for evt in atmcssimulator.Event if evt not in EVENTS_NOT_TO_EXPECT
+}
 
 
 class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
@@ -49,6 +59,7 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
         async with atmcssimulator.McsSimulator(csc=csc) as simulator:
             await simulator.cmd_evt_server.start_task
             await simulator.telemetry_server.start_task
+            await simulator.configure()
             yield simulator
 
     @contextlib.asynccontextmanager
@@ -95,6 +106,15 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
         assert "id" in data
         assert data["id"] == evt_name
 
+    async def verify_almost_all_events(self, client: tcpip.Client):
+        for i in range(len(EVENTS_TO_EXPECT)):
+            data = await client.read_json()
+            # No need for asserts here. If the data id is not present in
+            # registry or the validation of the schema fails, the test will
+            # fail as well.
+            json_schema = atmcssimulator.registry[f"logevent_{data['id']}"]
+            jsonschema.validate(data, json_schema)
+
     async def verify_command_response(
         self,
         client: tcpip.Client,
@@ -107,13 +127,39 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
         assert data[atmcssimulator.CommandKey.ID] == ack
         assert data[atmcssimulator.CommandKey.SEQUENCE_ID] == sequence_id
 
-    # TODO DM-39012: Improve this test after adding the simulator code.
     async def test_set_instrument_port(self) -> None:
         async with self.create_mcs_csc() as csc, self.create_mcs_simulator(
             csc
         ) as simulator, self.create_evt_cmd_client(simulator) as cmd_evt_client:
+            # First use a valid port number and verify that all responses are
+            # as expected, including the SUCCESS response.
             sequence_id = 1
-            port = 25000
+            port = 1
+            await cmd_evt_client.write_json(
+                data={
+                    atmcssimulator.CommandKey.ID: "cmd_setInstrumentPort",
+                    atmcssimulator.CommandKey.SEQUENCE_ID: sequence_id,
+                    atmcssimulator.CommandKey.PORT: port,
+                }
+            )
+            await self.verify_command_response(
+                client=cmd_evt_client,
+                ack=atmcssimulator.Ack.ACK,
+                sequence_id=sequence_id,
+            )
+            await self.verify_event(
+                client=cmd_evt_client, evt_name=atmcssimulator.Event.M3PORTSELECTED
+            )
+            await self.verify_command_response(
+                client=cmd_evt_client,
+                ack=atmcssimulator.Ack.SUCCESS,
+                sequence_id=sequence_id,
+            )
+
+            # Repeat with an invalid port number and verify that all responses
+            # are as expected, including the FAIL response.
+            sequence_id = 2
+            port = 25
             await cmd_evt_client.write_json(
                 data={
                     atmcssimulator.CommandKey.ID: "cmd_setInstrumentPort",
@@ -128,35 +174,33 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
             )
             await self.verify_command_response(
                 client=cmd_evt_client,
-                ack=atmcssimulator.Ack.SUCCESS,
+                ack=atmcssimulator.Ack.FAIL,
                 sequence_id=sequence_id,
             )
 
-    # TODO DM-39012: Improve this test after adding the simulator code.
+    async def verify_start_tracking(self, client: tcpip.Client) -> None:
+        sequence_id = 1
+        await client.write_json(
+            data={
+                atmcssimulator.CommandKey.ID: "cmd_startTracking",
+                atmcssimulator.CommandKey.SEQUENCE_ID: sequence_id,
+                atmcssimulator.CommandKey.VALUE: True,
+            }
+        )
+        await self.verify_command_response(
+            client=client, ack=atmcssimulator.Ack.ACK, sequence_id=sequence_id
+        )
+        await self.verify_almost_all_events(client=client)
+        await self.verify_command_response(
+            client=client, ack=atmcssimulator.Ack.SUCCESS, sequence_id=sequence_id
+        )
+
     async def test_start_tracking(self) -> None:
         async with self.create_mcs_csc() as csc, self.create_mcs_simulator(
             csc
         ) as simulator, self.create_evt_cmd_client(simulator) as cmd_evt_client:
-            sequence_id = 1
-            await cmd_evt_client.write_json(
-                data={
-                    atmcssimulator.CommandKey.ID: "cmd_startTracking",
-                    atmcssimulator.CommandKey.SEQUENCE_ID: sequence_id,
-                    atmcssimulator.CommandKey.VALUE: True,
-                }
-            )
-            await self.verify_command_response(
-                client=cmd_evt_client,
-                ack=atmcssimulator.Ack.ACK,
-                sequence_id=sequence_id,
-            )
-            await self.verify_command_response(
-                client=cmd_evt_client,
-                ack=atmcssimulator.Ack.SUCCESS,
-                sequence_id=sequence_id,
-            )
+            await self.verify_start_tracking(client=cmd_evt_client)
 
-    # TODO DM-39012: Improve this test after adding the simulator code.
     async def test_stop_tracking(self) -> None:
         async with self.create_mcs_csc() as csc, self.create_mcs_simulator(
             csc
@@ -174,32 +218,35 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
                 ack=atmcssimulator.Ack.ACK,
                 sequence_id=sequence_id,
             )
+            await self.verify_almost_all_events(client=cmd_evt_client)
             await self.verify_command_response(
                 client=cmd_evt_client,
                 ack=atmcssimulator.Ack.SUCCESS,
                 sequence_id=sequence_id,
             )
 
-    # TODO DM-39012: Improve this test after adding the simulator code.
     async def test_track_target(self) -> None:
         async with self.create_mcs_csc() as csc, self.create_mcs_simulator(
             csc
         ) as simulator, self.create_evt_cmd_client(simulator) as cmd_evt_client:
-            sequence_id = 1
+            await self.verify_start_tracking(client=cmd_evt_client)
+
+            # sequence_id == 1 was used by the start_tracking command.
+            sequence_id = 2
             await cmd_evt_client.write_json(
                 data={
                     atmcssimulator.CommandKey.ID: "cmd_trackTarget",
                     atmcssimulator.CommandKey.SEQUENCE_ID: sequence_id,
                     atmcssimulator.CommandKey.AZIMUTH: 0.0,
                     atmcssimulator.CommandKey.AZIMUTH_VELOCITY: 0.0,
-                    atmcssimulator.CommandKey.ELEVATION: 0.0,
+                    atmcssimulator.CommandKey.ELEVATION: 10.0,
                     atmcssimulator.CommandKey.ELEVATION_VELOCITY: 0.0,
                     atmcssimulator.CommandKey.NASMYTH1_ROTATOR_ANGLE: 0.0,
                     atmcssimulator.CommandKey.NASMYTH1_ROTATOR_ANGLE_VELOCITY: 0.0,
                     atmcssimulator.CommandKey.NASMYTH2_ROTATOR_ANGLE: 0.0,
                     atmcssimulator.CommandKey.NASMYTH2_ROTATOR_ANGLE_VELOCITY: 0.0,
                     atmcssimulator.CommandKey.RA_DE_SYS: "ICRS",
-                    atmcssimulator.CommandKey.TAI_TIME: 0.0,
+                    atmcssimulator.CommandKey.TAI_TIME: utils.current_tai(),
                     atmcssimulator.CommandKey.TRACK_ID: 1,
                     atmcssimulator.CommandKey.TRACK_SYS: "sidereal",
                 }
@@ -209,13 +256,15 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
                 ack=atmcssimulator.Ack.ACK,
                 sequence_id=sequence_id,
             )
+            await self.verify_event(
+                client=cmd_evt_client, evt_name=atmcssimulator.Event.TARGET
+            )
             await self.verify_command_response(
                 client=cmd_evt_client,
                 ack=atmcssimulator.Ack.SUCCESS,
                 sequence_id=sequence_id,
             )
 
-    # TODO DM-39012: Improve this test after adding the simulator code.
     async def test_non_existing_command(self) -> None:
         async with self.create_mcs_csc() as csc, self.create_mcs_simulator(
             csc
@@ -233,7 +282,6 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
                 sequence_id=sequence_id,
             )
 
-    # TODO DM-39012: Improve this test after adding the simulator code.
     async def test_skip_sequence_id(self) -> None:
         async with self.create_mcs_csc() as csc, self.create_mcs_simulator(
             csc
@@ -251,6 +299,7 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
                 ack=atmcssimulator.Ack.ACK,
                 sequence_id=sequence_id,
             )
+            await self.verify_almost_all_events(client=cmd_evt_client)
             await self.verify_command_response(
                 client=cmd_evt_client,
                 ack=atmcssimulator.Ack.SUCCESS,
@@ -261,7 +310,7 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
             sequence_id = 3
             await cmd_evt_client.write_json(
                 data={
-                    atmcssimulator.CommandKey.ID: "cmd_startTracking",
+                    atmcssimulator.CommandKey.ID: "cmd_stopTracking",
                     atmcssimulator.CommandKey.SEQUENCE_ID: sequence_id,
                     atmcssimulator.CommandKey.VALUE: True,
                 }
@@ -273,33 +322,17 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
             )
 
     async def test_update_events(self) -> None:
-        events_not_to_expect = {
-            atmcssimulator.Event.DETAILEDSTATE,
-            atmcssimulator.Event.M3PORTSELECTED,
-            atmcssimulator.Event.POSITIONLIMITS,
-            atmcssimulator.Event.TARGET,
-        }
-        events_to_expect = {
-            evt for evt in atmcssimulator.Event if evt not in events_not_to_expect
-        }
         async with self.create_mcs_csc() as csc, self.create_mcs_simulator(
             csc
         ) as simulator, self.create_evt_cmd_client(simulator) as evt_cmd_client:
             await simulator.configure()
             await simulator.update_events()
-            for _ in events_to_expect:
-                data = await evt_cmd_client.read_json()
-                # No need for asserts here. If the data id is not present in
-                # registry or the validation of the schema fails, the test will
-                # fail as well.
-                json_schema = atmcssimulator.registry[f"logevent_{data['id']}"]
-                jsonschema.validate(data, json_schema)
+            await self.verify_almost_all_events(client=evt_cmd_client)
 
     async def test_update_telemetry(self) -> None:
         async with self.create_mcs_csc() as csc, self.create_mcs_simulator(
             csc
         ) as simulator, self.create_telemetry_client(simulator) as telemetry_client:
-            await simulator.configure()
             await simulator.update_telemetry()
             for _ in atmcssimulator.Telemetry:
                 data = await telemetry_client.read_json()
