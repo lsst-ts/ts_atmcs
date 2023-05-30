@@ -78,6 +78,7 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
             assert simulator.cmd_evt_server.connected
             assert cmd_evt_client.connected
             await self.verify_event(client=cmd_evt_client, evt_name="positionLimits")
+            await self.verify_almost_all_events(client=cmd_evt_client)
             yield cmd_evt_client
 
     @contextlib.asynccontextmanager
@@ -106,7 +107,7 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
         assert "id" in data
         assert data["id"] == evt_name
 
-    async def verify_almost_all_events(self, client: tcpip.Client):
+    async def verify_almost_all_events(self, client: tcpip.Client) -> None:
         for i in range(len(EVENTS_TO_EXPECT)):
             data = await client.read_json()
             # No need for asserts here. If the data id is not present in

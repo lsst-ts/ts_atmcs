@@ -78,6 +78,8 @@ class McsSimulator:
             "trackTarget": self.track_target,
         }
 
+        # Task that runs while the events_and_telemetry_loop runs.
+        self._events_and_telemetry_task = utils.make_done_future()
         # Task that runs while axes are slewing to a halt from stopTracking.
         self._stop_tracking_task = utils.make_done_future()
         # Task that runs while axes are halting before being disabled.
@@ -339,6 +341,18 @@ class McsSimulator:
                 maximum=self.max_commanded_position.tolist(),
             )
 
+            axes_to_enable: set[int] = {Axis.Elevation, Axis.Azimuth}
+            tai = utils.current_tai()
+            rot_axis = self.m3_port_rot(tai)[1]
+            if rot_axis is not None:
+                axes_to_enable.add(rot_axis)
+            for axis in Axis:
+                self._axis_enabled[axis] = axis in axes_to_enable
+
+            await self.start_tasks()
+        else:
+            await self.stop_tasks()
+
     async def cmd_evt_dispatch_callback(self, data: dict[str, typing.Any]) -> None:
         data_ok = await self.verify_data(data=data)
         if not data_ok:
@@ -442,9 +456,9 @@ class McsSimulator:
             return
         self._tracking_enabled = True
         await self.update_events()
-        # TODO Not sure what to do here. The poriginal code in the CSC set the
-        #  CSC to FAULT after a certain period was passed but there is no way
-        #  to do that with the TCP/IP infrastructure.
+        # TODO DM-39408 Not sure what to do here. The original code in the CSC
+        #  set the CSC to FAULT after a certain period was passed but there is
+        #  no way to do that with the TCP/IP infrastructure.
         # self._set_tracking_timer(restart=True)
         await self.write_success_response(sequence_id=sequence_id)
 
@@ -455,15 +469,15 @@ class McsSimulator:
             await self.write_fail_response(sequence_id=sequence_id)
             return
 
-        # TODO Not sure what to do here. The poriginal code in the CSC set the
-        #  CSC to FAULT after a certain period was passed but there is no way
-        #  to do that with the TCP/IP infrastructure.
-        # self._set_tracking_timer(restart=False)
+        # TODO DM-39408 Not sure what to do here. The original code in the CSC
+        #  set the CSC to FAULT after a certain period was passed but there is
+        #  no way to do that with the TCP/IP infrastructure.
+        # self._set_tracking_timer(restart=True)
         self._tracking_enabled = False
         for axis in MainAxes:
             self.actuators[axis].stop()
         self._stop_tracking_task.cancel()
-        self._stop_tracking_task = asyncio.ensure_future(self._finish_stop_tracking())
+        self._stop_tracking_task = asyncio.create_task(self._finish_stop_tracking())
         await self.update_events()
         await self.write_success_response(sequence_id=sequence_id)
 
@@ -502,7 +516,7 @@ class McsSimulator:
             if np.any(np.abs(velocity) > self.max_velocity[0:4]):
                 await self.write_fail_response(sequence_id=sequence_id)
                 return
-        except Exception as e:
+        except Exception:
             await self.write_fail_response(sequence_id=sequence_id)
             return
 
@@ -530,9 +544,9 @@ class McsSimulator:
         self.csc.tel_mount_AzEl_Encoders.set(trackId=kwargs["trackId"])
         self.csc.tel_mount_Nasmyth_Encoders.set(trackId=kwargs["trackId"])
 
-        # TODO Not sure what to do here. The poriginal code in the CSC set the
-        #  CSC to FAULT after a certain period was passed but there is no way
-        #  to do that with the TCP/IP infrastructure.
+        # TODO DM-39408 Not sure what to do here. The original code in the CSC
+        #  set the CSC to FAULT after a certain period was passed but there is
+        #  no way to do that with the TCP/IP infrastructure.
         # self._set_tracking_timer(restart=True)
         await self.write_success_response(sequence_id=sequence_id)
 
@@ -1049,6 +1063,36 @@ class McsSimulator:
         items["id"] = tel_id
         await self.telemetry_server.write_json(data={**items})
 
+    async def disable_all_drives(self) -> None:
+        """Stop all drives, disable them and put on brakes."""
+        self._tracking_enabled = False
+        already_stopped = True
+        tai = utils.current_tai()
+        for axis in Axis:
+            actuator = self.actuators[axis]
+            if actuator.kind(tai) == actuator.Kind.Stopped:
+                self._axis_enabled[axis] = False
+            else:
+                already_stopped = False
+                actuator.stop()
+        self._disable_all_drives_task.cancel()
+        if not already_stopped:
+            self._disable_all_drives_task = asyncio.create_task(
+                self._finish_disable_all_drives()
+            )
+        await self.update_events()
+
+    async def _finish_disable_all_drives(self) -> None:
+        """Wait for the main axes to stop."""
+        end_times = [actuator.path[-1].tai for actuator in self.actuators]
+        max_end_time = max(end_times)
+        # give a bit of margin to be sure the axes are stopped
+        dt = 0.1 + max_end_time - utils.current_tai()
+        if dt > 0:
+            await asyncio.sleep(dt)
+        for axis in Axis:
+            self._axis_enabled[axis] = False
+
     async def _finish_stop_tracking(self) -> None:
         """Wait for the main axes to stop."""
         end_times = [self.actuators[axis].path[-1].tai for axis in MainAxes]
@@ -1056,6 +1100,18 @@ class McsSimulator:
         dt = 0.1 + max_end_time - utils.current_tai()
         if dt > 0:
             await asyncio.sleep(dt)
+
+    async def start_tasks(self) -> None:
+        if self._events_and_telemetry_task.done():
+            self._events_and_telemetry_task = asyncio.create_task(
+                self.events_and_telemetry_loop()
+            )
+
+    async def stop_tasks(self) -> None:
+        self._disable_all_drives_task.cancel()
+        self._stop_tracking_task.cancel()
+        self._events_and_telemetry_task.cancel()
+        self._kill_tracking_timer.cancel()
 
     async def events_and_telemetry_loop(self) -> None:
         """Output telemetry and events that have changed
