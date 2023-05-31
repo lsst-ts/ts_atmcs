@@ -31,15 +31,13 @@ from lsst.ts import atmcssimulator, tcpip, utils
 # Standard timeout in seconds.
 TIMEOUT = 2
 
-EVENTS_NOT_TO_EXPECT = {
+EVENTS_TO_NOT_EXPECT = {
     atmcssimulator.Event.DETAILEDSTATE,
     atmcssimulator.Event.M3PORTSELECTED,
     atmcssimulator.Event.POSITIONLIMITS,
     atmcssimulator.Event.TARGET,
 }
-EVENTS_TO_EXPECT = {
-    evt for evt in atmcssimulator.Event if evt not in EVENTS_NOT_TO_EXPECT
-}
+EVENTS_TO_EXPECT = set(atmcssimulator.Event) - EVENTS_TO_NOT_EXPECT
 
 
 class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
@@ -47,23 +45,17 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
         self.log = logging.getLogger(type(self).__name__)
 
     @contextlib.asynccontextmanager
-    async def create_mcs_csc(
-        self,
-    ) -> typing.AsyncGenerator[atmcssimulator.ATMCSCsc, None]:
-        yield atmcssimulator.ATMCSCsc()
-
-    @contextlib.asynccontextmanager
     async def create_mcs_simulator(
-        self, csc: atmcssimulator.ATMCSCsc
+        self,
     ) -> typing.AsyncGenerator[atmcssimulator.McsSimulator, None]:
-        async with atmcssimulator.McsSimulator(csc=csc) as simulator:
+        async with atmcssimulator.McsSimulator() as simulator:
             await simulator.cmd_evt_server.start_task
             await simulator.telemetry_server.start_task
             await simulator.configure()
             yield simulator
 
     @contextlib.asynccontextmanager
-    async def create_evt_cmd_client(
+    async def create_cmd_evt_client(
         self, simulator: atmcssimulator.McsSimulator
     ) -> typing.AsyncGenerator[tcpip.Client, None]:
         async with tcpip.Client(
@@ -129,9 +121,9 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
         assert data[atmcssimulator.CommandKey.SEQUENCE_ID] == sequence_id
 
     async def test_set_instrument_port(self) -> None:
-        async with self.create_mcs_csc() as csc, self.create_mcs_simulator(
-            csc
-        ) as simulator, self.create_evt_cmd_client(simulator) as cmd_evt_client:
+        async with self.create_mcs_simulator() as simulator, self.create_cmd_evt_client(
+            simulator
+        ) as cmd_evt_client:
             # First use a valid port number and verify that all responses are
             # as expected, including the SUCCESS response.
             sequence_id = 1
@@ -197,15 +189,15 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_start_tracking(self) -> None:
-        async with self.create_mcs_csc() as csc, self.create_mcs_simulator(
-            csc
-        ) as simulator, self.create_evt_cmd_client(simulator) as cmd_evt_client:
+        async with self.create_mcs_simulator() as simulator, self.create_cmd_evt_client(
+            simulator
+        ) as cmd_evt_client:
             await self.verify_start_tracking(client=cmd_evt_client)
 
     async def test_stop_tracking(self) -> None:
-        async with self.create_mcs_csc() as csc, self.create_mcs_simulator(
-            csc
-        ) as simulator, self.create_evt_cmd_client(simulator) as cmd_evt_client:
+        async with self.create_mcs_simulator() as simulator, self.create_cmd_evt_client(
+            simulator
+        ) as cmd_evt_client:
             sequence_id = 1
             await cmd_evt_client.write_json(
                 data={
@@ -227,9 +219,9 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
             )
 
     async def test_track_target(self) -> None:
-        async with self.create_mcs_csc() as csc, self.create_mcs_simulator(
-            csc
-        ) as simulator, self.create_evt_cmd_client(simulator) as cmd_evt_client:
+        async with self.create_mcs_simulator() as simulator, self.create_cmd_evt_client(
+            simulator
+        ) as cmd_evt_client:
             await self.verify_start_tracking(client=cmd_evt_client)
 
             # sequence_id == 1 was used by the start_tracking command.
@@ -267,9 +259,9 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
             )
 
     async def test_non_existing_command(self) -> None:
-        async with self.create_mcs_csc() as csc, self.create_mcs_simulator(
-            csc
-        ) as simulator, self.create_evt_cmd_client(simulator) as cmd_evt_client:
+        async with self.create_mcs_simulator() as simulator, self.create_cmd_evt_client(
+            simulator
+        ) as cmd_evt_client:
             sequence_id = 1
             await cmd_evt_client.write_json(
                 data={
@@ -284,9 +276,9 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
             )
 
     async def test_skip_sequence_id(self) -> None:
-        async with self.create_mcs_csc() as csc, self.create_mcs_simulator(
-            csc
-        ) as simulator, self.create_evt_cmd_client(simulator) as cmd_evt_client:
+        async with self.create_mcs_simulator() as simulator, self.create_cmd_evt_client(
+            simulator
+        ) as cmd_evt_client:
             sequence_id = 1
             await cmd_evt_client.write_json(
                 data={
@@ -323,17 +315,17 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
             )
 
     async def test_update_events(self) -> None:
-        async with self.create_mcs_csc() as csc, self.create_mcs_simulator(
-            csc
-        ) as simulator, self.create_evt_cmd_client(simulator) as evt_cmd_client:
+        async with self.create_mcs_simulator() as simulator, self.create_cmd_evt_client(
+            simulator
+        ) as cmd_evt_client:
             await simulator.configure()
             await simulator.update_events()
-            await self.verify_almost_all_events(client=evt_cmd_client)
+            await self.verify_almost_all_events(client=cmd_evt_client)
 
     async def test_update_telemetry(self) -> None:
-        async with self.create_mcs_csc() as csc, self.create_mcs_simulator(
-            csc
-        ) as simulator, self.create_telemetry_client(simulator) as telemetry_client:
+        async with self.create_mcs_simulator() as simulator, self.create_telemetry_client(
+            simulator
+        ) as telemetry_client:
             await simulator.update_telemetry()
             for _ in atmcssimulator.Telemetry:
                 data = await telemetry_client.read_json()
