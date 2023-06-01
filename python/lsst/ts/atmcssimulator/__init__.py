@@ -24,6 +24,7 @@ try:
 except ImportError:
     __version__ = "?"
 
+from .dataclasses import *
 from .enums import *
 from .mcs_csc import *
 from .mcs_server_simulator import *
