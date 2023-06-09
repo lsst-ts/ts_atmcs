@@ -3,7 +3,7 @@
     "type": "object",
     "properties": {
         "id": {
-            "const": "nasmyth1LimitSwitchCW"
+            "const": "evt_nasmyth1LimitSwitchCW"
         },
         "active": {
             "type": "boolean",

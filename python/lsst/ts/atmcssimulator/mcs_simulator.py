@@ -44,11 +44,11 @@ from .dataclasses import (
     TorqueDemand,
     Trajectory,
 )
-from .enums import Ack, Axis, CommandKey, Event, MainAxes, Telemetry
+from .enums import Ack, Axis, Command, CommandArgument, Event, MainAxes, Telemetry
 from .mcs_server_simulator import McsServerSimulator
 from .schemas.registry import registry
 
-CMD_ITEMS_TO_IGNORE = frozenset({CommandKey.ID, CommandKey.VALUE})
+CMD_ITEMS_TO_IGNORE = frozenset({CommandArgument.ID, CommandArgument.VALUE})
 
 
 class McsSimulator:
@@ -91,10 +91,10 @@ class McsSimulator:
 
         # Dict of command: function.
         self.dispatch_dict: dict[str, typing.Callable] = {
-            "setInstrumentPort": self.do_set_instrument_port,
-            "startTracking": self.do_start_tracking,
-            "stopTracking": self.do_stop_tracking,
-            "trackTarget": self.do_track_target,
+            Command.SET_INSTRUMENT_PORT: self.do_set_instrument_port,
+            Command.START_TRACKING: self.do_start_tracking,
+            Command.STOP_TRACKING: self.do_stop_tracking,
+            Command.TRACK_TARGET: self.do_track_target,
         }
 
         # Task that runs while the events_and_telemetry_loop runs.
@@ -120,49 +120,49 @@ class McsSimulator:
         # TODO DM-39469 Replace these tuples with a dict of new dataclasses.
         # Name of minimum limit switch event for each axis.
         self._min_lim_names = (
-            "elevationLimitSwitchLower",
-            "azimuthLimitSwitchCW",
-            "nasmyth1LimitSwitchCW",
-            "nasmyth2LimitSwitchCW",
-            "m3RotatorLimitSwitchCW",
+            Event.ELEVATIONLIMITSWITCHLOWER,
+            Event.AZIMUTHLIMITSWITCHCW,
+            Event.NASMYTH1LIMITSWITCHCW,
+            Event.NASMYTH2LIMITSWITCHCW,
+            Event.M3ROTATORLIMITSWITCHCW,
         )
         # Name of maximum limit switch event for each axis.
         self._max_lim_names = (
-            "elevationLimitSwitchUpper",
-            "azimuthLimitSwitchCCW",
-            "nasmyth1LimitSwitchCCW",
-            "nasmyth2LimitSwitchCCW",
-            "m3RotatorLimitSwitchCCW",
+            Event.ELEVATIONLIMITSWITCHUPPER,
+            Event.AZIMUTHLIMITSWITCHCCW,
+            Event.NASMYTH1LIMITSWITCHCCW,
+            Event.NASMYTH2LIMITSWITCHCCW,
+            Event.M3ROTATORLIMITSWITCHCCW,
         )
         # Name of "in position" event for each axis,
         # excluding ``allAxesInPosition``.
         self._in_position_names = (
-            "elevationInPosition",
-            "azimuthInPosition",
-            "nasmyth1RotatorInPosition",
-            "nasmyth2RotatorInPosition",
-            "m3InPosition",
+            Event.ELEVATIONINPOSITION,
+            Event.AZIMUTHINPOSITION,
+            Event.NASMYTH1ROTATORINPOSITION,
+            Event.NASMYTH2ROTATORINPOSITION,
+            Event.M3INPOSITION,
         )
         # Name of drive status events for each axis.
         self._drive_status_names = (
-            ("elevationDriveStatus",),
+            (Event.ELEVATIONDRIVESTATUS,),
             (
-                "azimuthDrive1Status",
-                "azimuthDrive2Status",
+                Event.AZIMUTHDRIVE1STATUS,
+                Event.AZIMUTHDRIVE2STATUS,
             ),
-            ("nasmyth1DriveStatus",),
-            ("nasmyth2DriveStatus",),
-            ("m3DriveStatus",),
+            (Event.NASMYTH1DRIVESTATUS,),
+            (Event.NASMYTH2DRIVESTATUS,),
+            (Event.M3DRIVESTATUS,),
         )
         # Name of brake events for each axis.
         self._brake_names = (
-            ("elevationBrake",),
+            (Event.ELEVATIONBRAKE,),
             (
-                "azimuthBrake1",
-                "azimuthBrake2",
+                Event.AZIMUTHBRAKE1,
+                Event.AZIMUTHBRAKE2,
             ),
-            ("nasmyth1Brake",),
-            ("nasmyth2Brake",),
+            (Event.NASMYTH1BRAKE,),
+            (Event.NASMYTH2BRAKE,),
             (),
         )
 
@@ -396,12 +396,14 @@ class McsSimulator:
         """
         data_ok = await self.verify_data(data=data)
         if not data_ok:
-            await self.write_noack_response(sequence_id=data[CommandKey.SEQUENCE_ID])
+            await self.write_noack_response(
+                sequence_id=data[CommandArgument.SEQUENCE_ID]
+            )
             return
 
-        await self.write_ack_response(sequence_id=data[CommandKey.SEQUENCE_ID])
+        await self.write_ack_response(sequence_id=data[CommandArgument.SEQUENCE_ID])
 
-        cmd = data[CommandKey.ID].replace("cmd_", "")
+        cmd = data[CommandArgument.ID]
         func = self.dispatch_dict[cmd]
         kwargs = {
             key: value for key, value in data.items() if key not in CMD_ITEMS_TO_IGNORE
@@ -439,15 +441,15 @@ class McsSimulator:
             Whether the data follows the correct format and has the correct
             contents or not.
         """
-        if CommandKey.ID not in data or CommandKey.SEQUENCE_ID not in data:
+        if CommandArgument.ID not in data or CommandArgument.SEQUENCE_ID not in data:
             self.log.error(f"Received invalid {data=}. Ignoring.")
             return False
-        payload_id = data[CommandKey.ID].replace("cmd_", "command_")
+        payload_id = data[CommandArgument.ID].replace("cmd_", "command_")
         if payload_id not in registry:
             self.log.error(f"Unknown command in {data=}.")
             return False
 
-        sequence_id = data[CommandKey.SEQUENCE_ID]
+        sequence_id = data[CommandArgument.SEQUENCE_ID]
         if self.last_sequence_id == 0:
             self.last_sequence_id = sequence_id
         else:
@@ -1163,7 +1165,7 @@ class McsSimulator:
         sequence_id : `int`
             The command sequence id.
         """
-        data = {CommandKey.ID: response, CommandKey.SEQUENCE_ID: sequence_id}
+        data = {CommandArgument.ID: response, CommandArgument.SEQUENCE_ID: sequence_id}
         await self.cmd_evt_server.write_json(data=data)
 
     async def write_ack_response(self, sequence_id: int) -> None:

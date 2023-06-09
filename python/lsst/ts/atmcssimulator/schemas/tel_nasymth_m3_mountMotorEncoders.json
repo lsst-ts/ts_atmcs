@@ -3,7 +3,7 @@
     "type": "object",
     "properties": {
         "id": {
-            "const": "nasymth_m3_mountMotorEncoders"
+            "const": "tel_nasymth_m3_mountMotorEncoders"
         },
         "cRIO_timestamp": {
             "type": "number",

@@ -3,7 +3,7 @@
     "type": "object",
     "properties": {
         "id": {
-            "const": "allAxesInPosition"
+            "const": "evt_allAxesInPosition"
         },
         "inPosition": {
             "type": "boolean",

@@ -3,7 +3,7 @@
     "type": "object",
     "properties": {
         "id": {
-            "const": "m3PortSelected"
+            "const": "evt_m3PortSelected"
         },
         "selected": {
             "type": "number",

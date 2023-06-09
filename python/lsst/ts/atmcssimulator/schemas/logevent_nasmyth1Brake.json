@@ -3,7 +3,7 @@
     "type": "object",
     "properties": {
         "id": {
-            "const": "nasmyth1Brake"
+            "const": "evt_nasmyth1Brake"
         },
         "engaged": {
             "type": "boolean",

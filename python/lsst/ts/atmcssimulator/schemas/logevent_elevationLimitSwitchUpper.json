@@ -3,7 +3,7 @@
     "type": "object",
     "properties": {
         "id": {
-            "const": "elevationLimitSwitchUpper"
+            "const": "evt_elevationLimitSwitchUpper"
         },
         "active": {
             "type": "boolean",

@@ -3,7 +3,7 @@
     "type": "object",
     "properties": {
         "id": {
-            "const": "elevationDriveStatus"
+            "const": "evt_elevationDriveStatus"
         },
         "enable": {
             "type": "boolean",

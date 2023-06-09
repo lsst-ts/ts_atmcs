@@ -3,7 +3,7 @@
     "type": "object",
     "properties": {
         "id": {
-            "const": "m3InPosition"
+            "const": "evt_m3InPosition"
         },
         "inPosition": {
             "type": "boolean",

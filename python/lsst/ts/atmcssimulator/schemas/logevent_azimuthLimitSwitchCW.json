@@ -3,7 +3,7 @@
     "type": "object",
     "properties": {
         "id": {
-            "const": "azimuthLimitSwitchCW"
+            "const": "evt_azimuthLimitSwitchCW"
         },
         "active": {
             "type": "boolean",
