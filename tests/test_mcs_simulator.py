@@ -327,10 +327,12 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
             await self.verify_almost_all_events(client=cmd_evt_client)
 
     async def test_update_telemetry(self) -> None:
-        async with self.create_mcs_simulator() as simulator, self.create_telemetry_client(
+        async with self.create_mcs_simulator() as simulator, self.create_cmd_evt_client(
             simulator
-        ) as telemetry_client:
-            await simulator.update_telemetry()
+        ), self.create_telemetry_client(simulator) as telemetry_client:
+            # No need to call ``simulator.update_telemetry`` explicitly since
+            # connecting with a cmd_evt_client starts the event and telemetry
+            # loop.
             for _ in atmcssimulator.Telemetry:
                 data = await telemetry_client.read_json()
                 # No need for asserts here. If the data id is not present in
