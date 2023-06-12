@@ -24,6 +24,7 @@ try:
 except ImportError:
     __version__ = "?"
 
+from .command_issued import *
 from .dataclasses import *
 from .enums import *
 from .mcs_csc import *
