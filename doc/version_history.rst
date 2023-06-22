@@ -13,11 +13,12 @@ v2.0.0
 * Add JSON schemas for command, event and telemetry exchange via TCP/IP.
 * Add MTC simulator and simulator server for testing the TCP/IP interaction with the real ATMCS server.
 * Move simulation code mostly unchanged from the CSC to the simulator.
+* Remove all simulator code from the CSC and connect to the simulator via TCP/IP.
 
 Requires:
 
 * ts_salobj 7.1
-* ts_tcpip 1.1
+* ts_tcpip 1.2
 * ts_utils 1
 * ts_simactuators 2
 * ts_idl 2
