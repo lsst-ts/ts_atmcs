@@ -3,7 +3,7 @@
     "type": "object",
     "properties": {
         "id": {
-            "const": "trajectory"
+            "const": "tel_trajectory"
         },
         "cRIO_timestamp": {
             "type": "number",

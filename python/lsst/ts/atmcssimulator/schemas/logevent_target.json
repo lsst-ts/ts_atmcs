@@ -3,7 +3,7 @@
     "type": "object",
     "properties": {
         "id": {
-            "const": "target"
+            "const": "evt_target"
         },
         "elevation": {
             "type": "number",

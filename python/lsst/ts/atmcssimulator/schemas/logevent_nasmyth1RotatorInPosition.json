@@ -3,7 +3,7 @@
     "type": "object",
     "properties": {
         "id": {
-            "const": "nasmyth1RotatorInPosition"
+            "const": "evt_nasmyth1RotatorInPosition"
         },
         "inPosition": {
             "type": "boolean",

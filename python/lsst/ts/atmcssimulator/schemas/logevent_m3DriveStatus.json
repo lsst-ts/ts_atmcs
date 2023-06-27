@@ -3,7 +3,7 @@
     "type": "object",
     "properties": {
         "id": {
-            "const": "m3DriveStatus"
+            "const": "evt_m3DriveStatus"
         },
         "enable": {
             "type": "boolean",

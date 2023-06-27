@@ -3,7 +3,7 @@
     "type": "object",
     "properties": {
         "id": {
-            "const": "measuredTorque"
+            "const": "tel_measuredTorque"
         },
         "cRIO_timestamp": {
             "type": "number",

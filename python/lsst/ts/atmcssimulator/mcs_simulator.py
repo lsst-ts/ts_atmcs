@@ -30,7 +30,7 @@ import typing
 
 import jsonschema
 import numpy as np
-from lsst.ts import salobj, simactuators, tcpip, utils
+from lsst.ts import simactuators, tcpip, utils
 from lsst.ts.idl.enums.ATMCS import AtMountState, M3ExitPort, M3State
 
 from .dataclasses import (
@@ -44,15 +44,42 @@ from .dataclasses import (
     TorqueDemand,
     Trajectory,
 )
-from .enums import Ack, Axis, CommandKey, Event, MainAxes, Telemetry
+from .enums import Ack, Axis, Command, CommandArgument, Event, MainAxes, Telemetry
 from .mcs_server_simulator import McsServerSimulator
 from .schemas.registry import registry
 
-CMD_ITEMS_TO_IGNORE = frozenset({CommandKey.ID, CommandKey.VALUE})
+CMD_ITEMS_TO_IGNORE = frozenset({CommandArgument.ID, CommandArgument.VALUE})
 
 
 class McsSimulator:
-    """Simulate the ATMCS system."""
+    """Simulate the ATMCS system.
+
+    Notes
+    -----
+    .. _axis:
+
+    The axes are, in order:
+    - elevation
+    - azimuth
+    - Nasmyth1 rotator
+    - Nasmyth2 rotator
+    - m3 rotator
+
+    **Limitations**
+
+    * Jerk is infinite.
+    * When an axis has multiple motors or encoders, all are treated as
+      identical (e.g. report identical positions).
+    * The only way to hit a limit switch is to configure the position
+      of that switch within the command limits for that axis.
+    * The CSC always wakes up at position 0 for all axes except elevation,
+      and at the minimum allowed position for elevation.
+    * The model for the azimuth topple block is primitive:
+
+      * The CCW switch is active if az < az1
+      * The CW switch is  active if az > az2
+      * Otherwise neither switch is active
+    """
 
     def __init__(self) -> None:
         self.log = logging.getLogger(type(self).__name__)
@@ -91,10 +118,10 @@ class McsSimulator:
 
         # Dict of command: function.
         self.dispatch_dict: dict[str, typing.Callable] = {
-            "setInstrumentPort": self.do_set_instrument_port,
-            "startTracking": self.do_start_tracking,
-            "stopTracking": self.do_stop_tracking,
-            "trackTarget": self.do_track_target,
+            Command.SET_INSTRUMENT_PORT: self.do_set_instrument_port,
+            Command.START_TRACKING: self.do_start_tracking,
+            Command.STOP_TRACKING: self.do_stop_tracking,
+            Command.TRACK_TARGET: self.do_track_target,
         }
 
         # Task that runs while the events_and_telemetry_loop runs.
@@ -120,49 +147,49 @@ class McsSimulator:
         # TODO DM-39469 Replace these tuples with a dict of new dataclasses.
         # Name of minimum limit switch event for each axis.
         self._min_lim_names = (
-            "elevationLimitSwitchLower",
-            "azimuthLimitSwitchCW",
-            "nasmyth1LimitSwitchCW",
-            "nasmyth2LimitSwitchCW",
-            "m3RotatorLimitSwitchCW",
+            Event.ELEVATIONLIMITSWITCHLOWER,
+            Event.AZIMUTHLIMITSWITCHCW,
+            Event.NASMYTH1LIMITSWITCHCW,
+            Event.NASMYTH2LIMITSWITCHCW,
+            Event.M3ROTATORLIMITSWITCHCW,
         )
         # Name of maximum limit switch event for each axis.
         self._max_lim_names = (
-            "elevationLimitSwitchUpper",
-            "azimuthLimitSwitchCCW",
-            "nasmyth1LimitSwitchCCW",
-            "nasmyth2LimitSwitchCCW",
-            "m3RotatorLimitSwitchCCW",
+            Event.ELEVATIONLIMITSWITCHUPPER,
+            Event.AZIMUTHLIMITSWITCHCCW,
+            Event.NASMYTH1LIMITSWITCHCCW,
+            Event.NASMYTH2LIMITSWITCHCCW,
+            Event.M3ROTATORLIMITSWITCHCCW,
         )
         # Name of "in position" event for each axis,
         # excluding ``allAxesInPosition``.
         self._in_position_names = (
-            "elevationInPosition",
-            "azimuthInPosition",
-            "nasmyth1RotatorInPosition",
-            "nasmyth2RotatorInPosition",
-            "m3InPosition",
+            Event.ELEVATIONINPOSITION,
+            Event.AZIMUTHINPOSITION,
+            Event.NASMYTH1ROTATORINPOSITION,
+            Event.NASMYTH2ROTATORINPOSITION,
+            Event.M3INPOSITION,
         )
         # Name of drive status events for each axis.
         self._drive_status_names = (
-            ("elevationDriveStatus",),
+            (Event.ELEVATIONDRIVESTATUS,),
             (
-                "azimuthDrive1Status",
-                "azimuthDrive2Status",
+                Event.AZIMUTHDRIVE1STATUS,
+                Event.AZIMUTHDRIVE2STATUS,
             ),
-            ("nasmyth1DriveStatus",),
-            ("nasmyth2DriveStatus",),
-            ("m3DriveStatus",),
+            (Event.NASMYTH1DRIVESTATUS,),
+            (Event.NASMYTH2DRIVESTATUS,),
+            (Event.M3DRIVESTATUS,),
         )
         # Name of brake events for each axis.
         self._brake_names = (
-            ("elevationBrake",),
+            (Event.ELEVATIONBRAKE,),
             (
-                "azimuthBrake1",
-                "azimuthBrake2",
+                Event.AZIMUTHBRAKE1,
+                Event.AZIMUTHBRAKE2,
             ),
-            ("nasmyth1Brake",),
-            ("nasmyth2Brake",),
+            (Event.NASMYTH1BRAKE,),
+            (Event.NASMYTH2BRAKE,),
             (),
         )
 
@@ -293,36 +320,6 @@ class McsSimulator:
             If limit_overtravel < 0.
         """
 
-        for axis in Axis:
-            if max_commanded_position[axis] < min_commanded_position[axis]:
-                raise salobj.ExpectedError(
-                    f"max_commanded_position[{axis}]={max_commanded_position[axis]} <= "
-                    f"min_commanded_position[{axis}]={min_commanded_position[axis]}"
-                )
-            if min_commanded_position[axis] > start_position[axis]:
-                raise salobj.ExpectedError(
-                    f"min_commanded_position[{axis}]={min_commanded_position[axis]} > "
-                    f"start_position[{axis}]={start_position[axis]}"
-                )
-            if max_commanded_position[axis] < start_position[axis]:
-                raise salobj.ExpectedError(
-                    f"max_commanded_position[{axis}]={max_commanded_position[axis]} < "
-                    f"start_position[{axis}]={start_position[axis]}"
-                )
-
-        if max_velocity.min() <= 0:
-            raise salobj.ExpectedError(
-                f"max_velocity={max_velocity}; all values must be positive"
-            )
-        if max_acceleration.min() <= 0:
-            raise salobj.ExpectedError(
-                f"max_acceleration={max_acceleration}; all values must be positive"
-            )
-        if limit_overtravel < 0:
-            raise salobj.ExpectedError(
-                f"limit_overtravel={limit_overtravel} must be >= 0"
-            )
-
         self.max_tracking_interval = max_tracking_interval
         self.min_commanded_position = min_commanded_position
         self.max_commanded_position = max_commanded_position
@@ -355,6 +352,14 @@ class McsSimulator:
         ]
         self.actuators[0].verbose = True
 
+        axes_to_enable: set[int] = {Axis.Elevation, Axis.Azimuth}
+        tai = utils.current_tai()
+        rot_axis = self.m3_port_rot(tai)[1]
+        if rot_axis is not None:
+            axes_to_enable.add(rot_axis)
+        for axis in Axis:
+            self._axis_enabled[axis] = axis in axes_to_enable
+
     async def connect_callback(self, server: tcpip.OneClientServer) -> None:
         """Callback function for when a client connects or disconnects.
 
@@ -368,14 +373,6 @@ class McsSimulator:
                 minimum=list(self.min_commanded_position),
                 maximum=list(self.max_commanded_position),
             )
-
-            axes_to_enable: set[int] = {Axis.Elevation, Axis.Azimuth}
-            tai = utils.current_tai()
-            rot_axis = self.m3_port_rot(tai)[1]
-            if rot_axis is not None:
-                axes_to_enable.add(rot_axis)
-            for axis in Axis:
-                self._axis_enabled[axis] = axis in axes_to_enable
 
             await self.start_tasks()
         else:
@@ -396,12 +393,14 @@ class McsSimulator:
         """
         data_ok = await self.verify_data(data=data)
         if not data_ok:
-            await self.write_noack_response(sequence_id=data[CommandKey.SEQUENCE_ID])
+            await self.write_noack_response(
+                sequence_id=data[CommandArgument.SEQUENCE_ID]
+            )
             return
 
-        await self.write_ack_response(sequence_id=data[CommandKey.SEQUENCE_ID])
+        await self.write_ack_response(sequence_id=data[CommandArgument.SEQUENCE_ID])
 
-        cmd = data[CommandKey.ID].replace("cmd_", "")
+        cmd = data[CommandArgument.ID]
         func = self.dispatch_dict[cmd]
         kwargs = {
             key: value for key, value in data.items() if key not in CMD_ITEMS_TO_IGNORE
@@ -439,20 +438,18 @@ class McsSimulator:
             Whether the data follows the correct format and has the correct
             contents or not.
         """
-        if CommandKey.ID not in data or CommandKey.SEQUENCE_ID not in data:
+        if CommandArgument.ID not in data or CommandArgument.SEQUENCE_ID not in data:
             self.log.error(f"Received invalid {data=}. Ignoring.")
             return False
-        payload_id = data[CommandKey.ID].replace("cmd_", "command_")
+        payload_id = data[CommandArgument.ID].replace("cmd_", "command_")
         if payload_id not in registry:
             self.log.error(f"Unknown command in {data=}.")
             return False
 
-        sequence_id = data[CommandKey.SEQUENCE_ID]
-        if self.last_sequence_id == 0:
-            self.last_sequence_id = sequence_id
-        else:
-            if sequence_id - self.last_sequence_id != 1:
-                return False
+        sequence_id = data[CommandArgument.SEQUENCE_ID]
+        if sequence_id - self.last_sequence_id != 1:
+            return False
+        self.last_sequence_id = sequence_id
 
         json_schema = registry[payload_id]
         try:
@@ -677,16 +674,7 @@ class McsSimulator:
         if the next ``trackTarget`` command is not seen quickly enough.
         """
         await asyncio.sleep(self.max_tracking_interval)
-        # TODO DM-39489 There is no simple feedback mechanism from the system
-        #  to the CSC via TCP/IP. Perhaps a new event message needs to be
-        #  introduced so the ATMCS system can inform the CSC, which then can
-        #  take proper action, perhaps even going to FAULT state. In any case,
-        #  this code should work as expected, hence the ticket.
-        # await self.fault(
-        #     code=2,
-        #     report="trackTarget not seen in "
-        #            f"{self.max_tracking_interval} sec",
-        # )
+        await self.disable_all_drives()
 
     def m3_port_rot(self, tai: float) -> tuple[int | None, int | None]:
         """Return exit port and rotator axis.
@@ -779,6 +767,12 @@ class McsSimulator:
         and for axes that have run into a limit switch, abort the axis,
         disable its drives and set its brakes.
         """
+        if not self.cmd_evt_server.connected:
+            self.log.warning("Not connected.")
+            return
+        if len(self.actuators) == 0:
+            self.log.warning("No actuators defined yet. Run 'configure' first.")
+            return
         try:
             tai = utils.current_tai()
             current_position = np.array(
@@ -947,12 +941,15 @@ class McsSimulator:
                 for field_name in detent_map.values()
             )
             await self._write_evt(evt_id=Event.M3ROTATORDETENTSWITCHES, **detent_values)
-        except Exception as e:
-            print(f"update_events failed: {e}")
+        except Exception:
+            self.log.exception("update_events failed.")
             raise
 
     async def update_telemetry(self) -> None:
         """Output all telemetry data messages."""
+        if not self.telemetry_server.connected:
+            self.log.warning("Not connected.")
+            return
         try:
             # TODO DM-38912 Send "nitems" via configuration.
             nitems = 100
@@ -1149,11 +1146,11 @@ class McsSimulator:
                 data=self.nasmyth_m3_mountMotorEncoders,
             )
         except Exception as e:
-            print(f"update_telemetry failed: {e}")
+            self.log.exception(f"update_telemetry failed: {e}")
             raise
 
-    async def _write_response(self, response: str, sequence_id: int) -> None:
-        """Generic write response function.
+    async def _write_command_response(self, response: str, sequence_id: int) -> None:
+        """Generic method to write a command response.
 
         Parameters
         ----------
@@ -1163,7 +1160,7 @@ class McsSimulator:
         sequence_id : `int`
             The command sequence id.
         """
-        data = {CommandKey.ID: response, CommandKey.SEQUENCE_ID: sequence_id}
+        data = {CommandArgument.ID: response, CommandArgument.SEQUENCE_ID: sequence_id}
         await self.cmd_evt_server.write_json(data=data)
 
     async def write_ack_response(self, sequence_id: int) -> None:
@@ -1174,7 +1171,7 @@ class McsSimulator:
         sequence_id : `int`
             The command sequence id.
         """
-        await self._write_response(Ack.ACK, sequence_id)
+        await self._write_command_response(Ack.ACK, sequence_id)
 
     async def write_fail_response(self, sequence_id: int) -> None:
         """Write a ``FAIL`` response.
@@ -1184,7 +1181,7 @@ class McsSimulator:
         sequence_id : `int`
             The command sequence id.
         """
-        await self._write_response(Ack.FAIL, sequence_id)
+        await self._write_command_response(Ack.FAIL, sequence_id)
 
     async def write_noack_response(self, sequence_id: int) -> None:
         """Write a ``NOACK`` response.
@@ -1194,7 +1191,7 @@ class McsSimulator:
         sequence_id : `int`
             The command sequence id.
         """
-        await self._write_response(Ack.NOACK, sequence_id)
+        await self._write_command_response(Ack.NOACK, sequence_id)
 
     async def write_success_response(self, sequence_id: int) -> None:
         """Write a ``SUCCESS`` response.
@@ -1204,22 +1201,39 @@ class McsSimulator:
         sequence_id : `int`
             The command sequence id.
         """
-        await self._write_response(Ack.SUCCESS, sequence_id)
+        await self._write_command_response(Ack.SUCCESS, sequence_id)
 
     async def _write_evt(self, evt_id: str, **kwargs: typing.Any) -> None:
-        await self.cmd_evt_server.write_json(data={"id": evt_id, **kwargs})
+        """Write an event message.
+
+        Parameters
+        ----------
+        evt_id : `str`
+            The name of the event, for instance ``evt_atMountState``.
+        kwargs : `typing.Any`
+            The data to include in the event message.
+        """
+        data = {"id": evt_id, **kwargs}
+        await self.cmd_evt_server.write_json(data=data)
 
     async def _write_telemetry(
         self, tel_id: str, timestamp: np.float64, data: typing.Any
     ) -> None:
+        """Write a telemetry message.
+
+        Parameters
+        ----------
+        tel_id : `str`
+            The name of the telemetry.
+        timestamp : `np.float64`
+            The timestamp of the telemetry.
+        data : `typing.Any`
+            The data to include in the telemetry message.
+        """
         data.cRIO_timestamp = timestamp.item()
-
-        # This needs to be cleaned up as soon as we have moved to Kafka.
-        data_dict = data.get_vars() if hasattr(data, "get_vars") else vars(data)
-        items = {k: v for k, v in data_dict.items() if not k.startswith("private")}
-
-        items["id"] = tel_id
-        await self.telemetry_server.write_json(data={**items})
+        data.id = tel_id
+        data_dict = vars(data)
+        await self.telemetry_server.write_json(data=data_dict)
 
     async def disable_all_drives(self) -> None:
         """Stop all drives, disable them and put on brakes."""
@@ -1293,19 +1307,6 @@ class McsSimulator:
                 await self.update_telemetry()
 
             await asyncio.sleep(self._telemetry_interval / self._events_per_telemetry)
-
-    def __enter__(self) -> None:
-        # This class only implements an async context manager.
-        raise NotImplementedError("Use 'async with' instead.")
-
-    def __exit__(
-        self,
-        type: typing.Type[BaseException],
-        value: BaseException,
-        traceback: types.TracebackType,
-    ) -> None:
-        # __exit__ should exist in pair with __enter__ but never be executed.
-        raise NotImplementedError("Use 'async with' instead.")
 
     async def __aenter__(self) -> McsSimulator:
         return self

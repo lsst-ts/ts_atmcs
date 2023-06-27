@@ -3,7 +3,7 @@
     "type": "object",
     "properties": {
         "id": {
-            "const": "mount_AzEl_Encoders"
+            "const": "tel_mount_AzEl_Encoders"
         },
         "cRIO_timestamp": {
             "type": "number",

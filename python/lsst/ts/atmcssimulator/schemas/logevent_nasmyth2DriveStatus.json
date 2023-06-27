@@ -3,7 +3,7 @@
     "type": "object",
     "properties": {
         "id": {
-            "const": "nasmyth2DriveStatus"
+            "const": "evt_nasmyth2DriveStatus"
         },
         "enable": {
             "type": "boolean",

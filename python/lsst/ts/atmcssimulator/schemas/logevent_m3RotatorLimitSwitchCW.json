@@ -3,7 +3,7 @@
     "type": "object",
     "properties": {
         "id": {
-            "const": "m3RotatorLimitSwitchCW"
+            "const": "evt_m3RotatorLimitSwitchCW"
         },
         "active": {
             "type": "boolean",

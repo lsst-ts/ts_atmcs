@@ -3,7 +3,7 @@
     "type": "object",
     "properties": {
         "id": {
-            "const": "positionLimits"
+            "const": "evt_positionLimits"
         },
         "minimum": {
             "type": "array",

@@ -3,7 +3,7 @@
     "type": "object",
     "properties": {
         "id": {
-            "const": "torqueDemand"
+            "const": "tel_torqueDemand"
         },
         "cRIO_timestamp": {
             "type": "number",

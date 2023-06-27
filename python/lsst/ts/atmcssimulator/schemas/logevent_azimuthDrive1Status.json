@@ -3,7 +3,7 @@
     "type": "object",
     "properties": {
         "id": {
-            "const": "azimuthDrive1Status"
+            "const": "evt_azimuthDrive1Status"
         },
         "enable": {
             "type": "boolean",

@@ -3,7 +3,7 @@
     "type": "object",
     "properties": {
         "id": {
-            "const": "azimuthBrake1"
+            "const": "evt_azimuthBrake1"
         },
         "engaged": {
             "type": "boolean",

@@ -3,7 +3,7 @@
     "type": "object",
     "properties": {
         "id": {
-            "const": "m3RotatorDetentSwitches"
+            "const": "evt_m3RotatorDetentSwitches"
         },
         "nasmyth1Active": {
             "type": "boolean",

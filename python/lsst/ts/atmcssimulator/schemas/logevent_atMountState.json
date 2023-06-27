@@ -3,7 +3,7 @@
     "type": "object",
     "properties": {
         "id": {
-            "const": "atMountState"
+            "const": "evt_atMountState"
         },
         "state": {
             "type": "number",
