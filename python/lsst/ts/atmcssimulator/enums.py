@@ -20,7 +20,6 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 __all__ = [
-    "Ack",
     "Axis",
     "Command",
     "CommandArgument",
@@ -30,13 +29,6 @@ __all__ = [
 ]
 
 import enum
-
-
-class Ack(str, enum.Enum):
-    ACK = "ack"
-    FAIL = "fail"
-    NOACK = "noack"
-    SUCCESS = "success"
 
 
 class Axis(enum.IntEnum):
@@ -63,18 +55,15 @@ class CommandArgument(str, enum.Enum):
     AZIMUTH_VELOCITY = "azimuthVelocity"
     ELEVATION = "elevation"
     ELEVATION_VELOCITY = "elevationVelocity"
-    ID = "id"
     NASMYTH1_ROTATOR_ANGLE = "nasmyth1RotatorAngle"
     NASMYTH1_ROTATOR_ANGLE_VELOCITY = "nasmyth1RotatorAngleVelocity"
     NASMYTH2_ROTATOR_ANGLE = "nasmyth2RotatorAngle"
     NASMYTH2_ROTATOR_ANGLE_VELOCITY = "nasmyth2RotatorAngleVelocity"
     PORT = "port"
     RA_DE_SYS = "radesys"
-    SEQUENCE_ID = "sequence_id"
     TAI_TIME = "taiTime"
     TRACK_ID = "trackId"
     TRACK_SYS = "tracksys"
-    VALUE = "value"
 
 
 class Event(str, enum.Enum):

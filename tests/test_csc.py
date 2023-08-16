@@ -110,7 +110,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         """
         async with self.make_csc(initial_state=salobj.State.ENABLED):
             await self.assert_next_summary_state(salobj.State.ENABLED)
-            await self.csc.mcs_simulator.configure()
+            await self.csc.simulator.configure()
             await self.assert_next_sample(
                 topic=self.remote.evt_softwareVersions,
                 cscVersion=atmcssimulator.__version__ + "-sim",
@@ -153,7 +153,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 * 5,
                 dtype=float,
             )
-            await self.csc.mcs_simulator.configure(
+            await self.csc.simulator.configure(
                 min_commanded_position=min_commanded_position,
                 max_commanded_position=max_commanded_position,
                 max_velocity=max_velocity,
@@ -310,7 +310,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             # Send to ENABLED state; this should enable
             # elevation, azimuth and NA2 axes.
             await self.remote.cmd_enable.start()
-            await self.csc.mcs_simulator.configure()
+            await self.csc.simulator.configure()
 
             for event in self.brake_events:
                 if event is self.remote.evt_nasmyth2Brake:
@@ -348,7 +348,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         async with self.make_csc(initial_state=salobj.State.ENABLED):
             # Get the initial summary state, so `fault_to_enabled` sees FAULT.
             await self.assert_next_summary_state(salobj.State.ENABLED)
-            await self.csc.mcs_simulator.configure(
+            await self.csc.simulator.configure(
                 max_velocity=np.array(
                     [
                         100,
@@ -401,7 +401,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             with salobj.assertRaisesAckError():
                 await self.remote.cmd_startTracking.start()
 
-            actuator = self.csc.mcs_simulator.actuators[atmcssimulator.Axis.M3]
+            actuator = self.csc.simulator.actuators[atmcssimulator.Axis.M3]
             curr_segment = actuator.path.at(utils.current_tai())
             assert curr_segment.velocity != 0
 
@@ -456,7 +456,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
     async def test_track(self) -> None:
         async with self.make_csc(initial_state=salobj.State.ENABLED):
-            await self.csc.mcs_simulator.configure(
+            await self.csc.simulator.configure(
                 max_velocity=np.array(
                     [
                         100,
@@ -559,7 +559,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             # Get the initial summary state, so `fault_to_enabled` sees FAULT.
             await self.assert_next_summary_state(salobj.State.ENABLED)
 
-            await self.csc.mcs_simulator.configure(
+            await self.csc.simulator.configure(
                 max_tracking_interval=max_tracking_interval,
                 max_velocity=np.array(
                     [
@@ -621,7 +621,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     async def test_stop_tracking_while_slewing(self) -> None:
         """Call stopTracking while tracking, before a slew is done."""
         async with self.make_csc(initial_state=salobj.State.ENABLED):
-            await self.csc.mcs_simulator.configure()
+            await self.csc.simulator.configure()
             await self.assert_next_sample(
                 self.remote.evt_atMountState, state=AtMountState.TRACKINGDISABLED
             )
@@ -670,7 +670,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 self.remote.evt_atMountState, state=AtMountState.TRACKINGDISABLED
             )
 
-            for actuator in self.csc.mcs_simulator.actuators:
+            for actuator in self.csc.simulator.actuators:
                 assert actuator.kind() == actuator.Kind.Stopped
 
     async def test_disable_while_slewing(self) -> None:
@@ -678,7 +678,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         async with self.make_csc(initial_state=salobj.State.ENABLED):
             state = await self.remote.evt_summaryState.next(flush=False, timeout=5)
             assert state.summaryState == salobj.State.ENABLED
-            await self.csc.mcs_simulator.configure()
+            await self.csc.simulator.configure()
             await self.assert_next_sample(
                 self.remote.evt_atMountState, state=AtMountState.TRACKINGDISABLED
             )
