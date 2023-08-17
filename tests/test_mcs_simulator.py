@@ -26,7 +26,7 @@ import typing
 import unittest
 
 import jsonschema
-from lsst.ts import atmcssimulator, tcpip, utils
+from lsst.ts import atmcssimulator, attcpip, tcpip, utils
 
 # Standard timeout in seconds.
 TIMEOUT = 2
@@ -107,7 +107,7 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
             # No need for asserts here. If the data id is not present in
             # registry or the validation of the schema fails, the test will
             # fail as well.
-            json_schema = atmcssimulator.registry[
+            json_schema = attcpip.registry[
                 f"logevent_{data['id'].removeprefix('evt_')}"
             ]
             jsonschema.validate(data, json_schema)
@@ -115,14 +115,14 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
     async def verify_command_response(
         self,
         client: tcpip.Client,
-        ack: atmcssimulator.Ack,
+        ack: attcpip.Ack,
         sequence_id: int,
     ) -> None:
         data = await client.read_json()
-        assert atmcssimulator.CommandArgument.ID in data
-        assert atmcssimulator.CommandArgument.SEQUENCE_ID in data
-        assert data[atmcssimulator.CommandArgument.ID] == ack
-        assert data[atmcssimulator.CommandArgument.SEQUENCE_ID] == sequence_id
+        assert attcpip.CommonCommandArgument.ID in data
+        assert attcpip.CommonCommandArgument.SEQUENCE_ID in data
+        assert data[attcpip.CommonCommandArgument.ID] == ack
+        assert data[attcpip.CommonCommandArgument.SEQUENCE_ID] == sequence_id
 
     async def test_set_instrument_port(self) -> None:
         async with self.create_mcs_simulator() as simulator, self.create_cmd_evt_client(
@@ -134,14 +134,14 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
             port = 1
             await cmd_evt_client.write_json(
                 data={
-                    atmcssimulator.CommandArgument.ID: "cmd_setInstrumentPort",
-                    atmcssimulator.CommandArgument.SEQUENCE_ID: sequence_id,
+                    attcpip.CommonCommandArgument.ID: "cmd_setInstrumentPort",
+                    attcpip.CommonCommandArgument.SEQUENCE_ID: sequence_id,
                     atmcssimulator.CommandArgument.PORT: port,
                 }
             )
             await self.verify_command_response(
                 client=cmd_evt_client,
-                ack=atmcssimulator.Ack.ACK,
+                ack=attcpip.Ack.ACK,
                 sequence_id=sequence_id,
             )
             await self.verify_event(
@@ -149,7 +149,7 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
             )
             await self.verify_command_response(
                 client=cmd_evt_client,
-                ack=atmcssimulator.Ack.SUCCESS,
+                ack=attcpip.Ack.SUCCESS,
                 sequence_id=sequence_id,
             )
 
@@ -159,19 +159,19 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
             port = 25
             await cmd_evt_client.write_json(
                 data={
-                    atmcssimulator.CommandArgument.ID: "cmd_setInstrumentPort",
-                    atmcssimulator.CommandArgument.SEQUENCE_ID: sequence_id,
+                    attcpip.CommonCommandArgument.ID: "cmd_setInstrumentPort",
+                    attcpip.CommonCommandArgument.SEQUENCE_ID: sequence_id,
                     atmcssimulator.CommandArgument.PORT: port,
                 }
             )
             await self.verify_command_response(
                 client=cmd_evt_client,
-                ack=atmcssimulator.Ack.ACK,
+                ack=attcpip.Ack.ACK,
                 sequence_id=sequence_id,
             )
             await self.verify_command_response(
                 client=cmd_evt_client,
-                ack=atmcssimulator.Ack.FAIL,
+                ack=attcpip.Ack.FAIL,
                 sequence_id=sequence_id,
             )
 
@@ -179,17 +179,17 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
         sequence_id = 1
         await client.write_json(
             data={
-                atmcssimulator.CommandArgument.ID: "cmd_startTracking",
-                atmcssimulator.CommandArgument.SEQUENCE_ID: sequence_id,
-                atmcssimulator.CommandArgument.VALUE: True,
+                attcpip.CommonCommandArgument.ID: "cmd_startTracking",
+                attcpip.CommonCommandArgument.SEQUENCE_ID: sequence_id,
+                attcpip.CommonCommandArgument.VALUE: True,
             }
         )
         await self.verify_command_response(
-            client=client, ack=atmcssimulator.Ack.ACK, sequence_id=sequence_id
+            client=client, ack=attcpip.Ack.ACK, sequence_id=sequence_id
         )
         await self.verify_almost_all_events(client=client)
         await self.verify_command_response(
-            client=client, ack=atmcssimulator.Ack.SUCCESS, sequence_id=sequence_id
+            client=client, ack=attcpip.Ack.SUCCESS, sequence_id=sequence_id
         )
 
     async def test_start_tracking(self) -> None:
@@ -205,20 +205,20 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
             sequence_id = 1
             await cmd_evt_client.write_json(
                 data={
-                    atmcssimulator.CommandArgument.ID: "cmd_stopTracking",
-                    atmcssimulator.CommandArgument.SEQUENCE_ID: sequence_id,
-                    atmcssimulator.CommandArgument.VALUE: True,
+                    attcpip.CommonCommandArgument.ID: "cmd_stopTracking",
+                    attcpip.CommonCommandArgument.SEQUENCE_ID: sequence_id,
+                    attcpip.CommonCommandArgument.VALUE: True,
                 }
             )
             await self.verify_command_response(
                 client=cmd_evt_client,
-                ack=atmcssimulator.Ack.ACK,
+                ack=attcpip.Ack.ACK,
                 sequence_id=sequence_id,
             )
             await self.verify_almost_all_events(client=cmd_evt_client)
             await self.verify_command_response(
                 client=cmd_evt_client,
-                ack=atmcssimulator.Ack.SUCCESS,
+                ack=attcpip.Ack.SUCCESS,
                 sequence_id=sequence_id,
             )
 
@@ -232,8 +232,8 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
             sequence_id = 2
             await cmd_evt_client.write_json(
                 data={
-                    atmcssimulator.CommandArgument.ID: "cmd_trackTarget",
-                    atmcssimulator.CommandArgument.SEQUENCE_ID: sequence_id,
+                    attcpip.CommonCommandArgument.ID: "cmd_trackTarget",
+                    attcpip.CommonCommandArgument.SEQUENCE_ID: sequence_id,
                     atmcssimulator.CommandArgument.AZIMUTH: 0.0,
                     atmcssimulator.CommandArgument.AZIMUTH_VELOCITY: 0.0,
                     atmcssimulator.CommandArgument.ELEVATION: 10.0,
@@ -250,7 +250,7 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
             )
             await self.verify_command_response(
                 client=cmd_evt_client,
-                ack=atmcssimulator.Ack.ACK,
+                ack=attcpip.Ack.ACK,
                 sequence_id=sequence_id,
             )
             await self.verify_event(
@@ -258,7 +258,7 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
             )
             await self.verify_command_response(
                 client=cmd_evt_client,
-                ack=atmcssimulator.Ack.SUCCESS,
+                ack=attcpip.Ack.SUCCESS,
                 sequence_id=sequence_id,
             )
 
@@ -269,13 +269,13 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
             sequence_id = 1
             await cmd_evt_client.write_json(
                 data={
-                    atmcssimulator.CommandArgument.ID: "non-existing",
-                    atmcssimulator.CommandArgument.SEQUENCE_ID: sequence_id,
+                    attcpip.CommonCommandArgument.ID: "non-existing",
+                    attcpip.CommonCommandArgument.SEQUENCE_ID: sequence_id,
                 }
             )
             await self.verify_command_response(
                 client=cmd_evt_client,
-                ack=atmcssimulator.Ack.NOACK,
+                ack=attcpip.Ack.NOACK,
                 sequence_id=sequence_id,
             )
 
@@ -286,20 +286,20 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
             sequence_id = 1
             await cmd_evt_client.write_json(
                 data={
-                    atmcssimulator.CommandArgument.ID: "cmd_startTracking",
-                    atmcssimulator.CommandArgument.SEQUENCE_ID: sequence_id,
-                    atmcssimulator.CommandArgument.VALUE: True,
+                    attcpip.CommonCommandArgument.ID: "cmd_startTracking",
+                    attcpip.CommonCommandArgument.SEQUENCE_ID: sequence_id,
+                    attcpip.CommonCommandArgument.VALUE: True,
                 }
             )
             await self.verify_command_response(
                 client=cmd_evt_client,
-                ack=atmcssimulator.Ack.ACK,
+                ack=attcpip.Ack.ACK,
                 sequence_id=sequence_id,
             )
             await self.verify_almost_all_events(client=cmd_evt_client)
             await self.verify_command_response(
                 client=cmd_evt_client,
-                ack=atmcssimulator.Ack.SUCCESS,
+                ack=attcpip.Ack.SUCCESS,
                 sequence_id=sequence_id,
             )
 
@@ -307,14 +307,14 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
             sequence_id = 3
             await cmd_evt_client.write_json(
                 data={
-                    atmcssimulator.CommandArgument.ID: "cmd_stopTracking",
-                    atmcssimulator.CommandArgument.SEQUENCE_ID: sequence_id,
-                    atmcssimulator.CommandArgument.VALUE: True,
+                    attcpip.CommonCommandArgument.ID: "cmd_stopTracking",
+                    attcpip.CommonCommandArgument.SEQUENCE_ID: sequence_id,
+                    attcpip.CommonCommandArgument.VALUE: True,
                 }
             )
             await self.verify_command_response(
                 client=cmd_evt_client,
-                ack=atmcssimulator.Ack.NOACK,
+                ack=attcpip.Ack.NOACK,
                 sequence_id=sequence_id,
             )
 
@@ -338,5 +338,5 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
                 # No need for asserts here. If the data id is not present in
                 # registry or the validation of the schema fails, the test will
                 # fail as well.
-                json_schema = atmcssimulator.registry[f"{data['id']}"]
+                json_schema = attcpip.registry[f"{data['id']}"]
                 jsonschema.validate(data, json_schema)

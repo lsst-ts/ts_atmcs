@@ -19,18 +19,14 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from __future__ import annotations
-
 __all__ = ["McsSimulator"]
 
 import asyncio
-import logging
-import types
+import pathlib
 import typing
 
-import jsonschema
 import numpy as np
-from lsst.ts import simactuators, tcpip, utils
+from lsst.ts import attcpip, simactuators, tcpip, utils
 from lsst.ts.idl.enums.ATMCS import AtMountState, M3ExitPort, M3State
 
 from .dataclasses import (
@@ -44,14 +40,14 @@ from .dataclasses import (
     TorqueDemand,
     Trajectory,
 )
-from .enums import Ack, Axis, Command, CommandArgument, Event, MainAxes, Telemetry
-from .mcs_server_simulator import McsServerSimulator
-from .schemas.registry import registry
+from .enums import Axis, Command, Event, MainAxes, Telemetry
 
-CMD_ITEMS_TO_IGNORE = frozenset({CommandArgument.ID, CommandArgument.VALUE})
+CMD_ITEMS_TO_IGNORE = frozenset(
+    {attcpip.CommonCommandArgument.ID, attcpip.CommonCommandArgument.VALUE}
+)
 
 
-class McsSimulator:
+class McsSimulator(attcpip.AtSimulator):
     """Simulate the ATMCS system.
 
     Notes
@@ -82,24 +78,7 @@ class McsSimulator:
     """
 
     def __init__(self) -> None:
-        self.log = logging.getLogger(type(self).__name__)
-        # TODO DM-38912 Send "port" via configuration.
-        self.cmd_evt_server = McsServerSimulator(
-            host=tcpip.LOCALHOST_IPV4,
-            port=5000,
-            log=self.log,
-            dispatch_callback=self.cmd_evt_dispatch_callback,
-            connect_callback=self.connect_callback,
-            name="CmdEvtMcsServer",
-        )
-        # TODO DM-38912 Send "port" via configuration.
-        self.telemetry_server = McsServerSimulator(
-            host=tcpip.LOCALHOST_IPV4,
-            port=6000,
-            log=self.log,
-            dispatch_callback=self.telemetry_dispatch_callback,
-            name="TelemetryMcsServer",
-        )
+        super().__init__()
 
         # Variables holding the data for the telemetry messages.
         self.azel_mountMotorEncoders = AzElMountMotorEncoders()
@@ -233,6 +212,10 @@ class McsSimulator:
         # allowed position error for M3 to be considered in position (deg)
         self.m3tolerance = 1e-5
 
+    def load_schemas(self) -> None:
+        schema_dir = pathlib.Path(__file__).parent / "schemas"
+        attcpip.load_schemas(schema_dir=schema_dir)
+
     # TODO DM-38912 Make this configurable.
     async def configure(
         self,
@@ -360,7 +343,7 @@ class McsSimulator:
         for axis in Axis:
             self._axis_enabled[axis] = axis in axes_to_enable
 
-    async def connect_callback(self, server: tcpip.OneClientServer) -> None:
+    async def cmd_evt_connect_callback(self, server: tcpip.OneClientServer) -> None:
         """Callback function for when a client connects or disconnects.
 
         When a client connects, all axes are enabled and background tasks are
@@ -394,70 +377,20 @@ class McsSimulator:
         data_ok = await self.verify_data(data=data)
         if not data_ok:
             await self.write_noack_response(
-                sequence_id=data[CommandArgument.SEQUENCE_ID]
+                sequence_id=data[attcpip.CommonCommandArgument.SEQUENCE_ID]
             )
             return
 
-        await self.write_ack_response(sequence_id=data[CommandArgument.SEQUENCE_ID])
+        await self.write_ack_response(
+            sequence_id=data[attcpip.CommonCommandArgument.SEQUENCE_ID]
+        )
 
-        cmd = data[CommandArgument.ID]
+        cmd = data[attcpip.CommonCommandArgument.ID]
         func = self.dispatch_dict[cmd]
         kwargs = {
             key: value for key, value in data.items() if key not in CMD_ITEMS_TO_IGNORE
         }
         await func(**kwargs)
-
-    async def telemetry_dispatch_callback(self, data: typing.Any) -> None:
-        """Asynchronous function to call when data are read and dispatched.
-
-        The received data ignored since the telemetry server is only supposed
-        to send data and not to receive any.
-
-        Parameters
-        ----------
-        data : `dict`[`str`, `typing.Any`]
-            The data sent to the server.
-        """
-        pass
-
-    async def verify_data(self, data: dict[str, typing.Any]) -> bool:
-        """Verify the format and values of the data.
-
-        The format of the data is described at
-        https://github.com/lsst-ts/ts_labview_tcp_json
-        as well as in the JSON schemas in the schemas directory.
-
-        Parameters
-        ----------
-        data : `dict` of `any`
-            The dict to be verified.
-
-        Returns
-        -------
-        bool:
-            Whether the data follows the correct format and has the correct
-            contents or not.
-        """
-        if CommandArgument.ID not in data or CommandArgument.SEQUENCE_ID not in data:
-            self.log.error(f"Received invalid {data=}. Ignoring.")
-            return False
-        payload_id = data[CommandArgument.ID].replace("cmd_", "command_")
-        if payload_id not in registry:
-            self.log.error(f"Unknown command in {data=}.")
-            return False
-
-        sequence_id = data[CommandArgument.SEQUENCE_ID]
-        if sequence_id - self.last_sequence_id != 1:
-            return False
-        self.last_sequence_id = sequence_id
-
-        json_schema = registry[payload_id]
-        try:
-            jsonschema.validate(data, json_schema)
-        except jsonschema.ValidationError as e:
-            self.log.exception("Validation failed.", e)
-            return False
-        return True
 
     async def do_set_instrument_port(self, *, sequence_id: int, port: int) -> None:
         """Set the M3 instrument port.
@@ -1149,92 +1082,6 @@ class McsSimulator:
             self.log.exception(f"update_telemetry failed: {e}")
             raise
 
-    async def _write_command_response(self, response: str, sequence_id: int) -> None:
-        """Generic method to write a command response.
-
-        Parameters
-        ----------
-        response : `str`
-            The response to write. Acceptable responses are defined in the
-            ``Ack`` enum. The value of response is not checked.
-        sequence_id : `int`
-            The command sequence id.
-        """
-        data = {CommandArgument.ID: response, CommandArgument.SEQUENCE_ID: sequence_id}
-        await self.cmd_evt_server.write_json(data=data)
-
-    async def write_ack_response(self, sequence_id: int) -> None:
-        """Write an ``ACK`` response.
-
-        Parameters
-        ----------
-        sequence_id : `int`
-            The command sequence id.
-        """
-        await self._write_command_response(Ack.ACK, sequence_id)
-
-    async def write_fail_response(self, sequence_id: int) -> None:
-        """Write a ``FAIL`` response.
-
-        Parameters
-        ----------
-        sequence_id : `int`
-            The command sequence id.
-        """
-        await self._write_command_response(Ack.FAIL, sequence_id)
-
-    async def write_noack_response(self, sequence_id: int) -> None:
-        """Write a ``NOACK`` response.
-
-        Parameters
-        ----------
-        sequence_id : `int`
-            The command sequence id.
-        """
-        await self._write_command_response(Ack.NOACK, sequence_id)
-
-    async def write_success_response(self, sequence_id: int) -> None:
-        """Write a ``SUCCESS`` response.
-
-        Parameters
-        ----------
-        sequence_id : `int`
-            The command sequence id.
-        """
-        await self._write_command_response(Ack.SUCCESS, sequence_id)
-
-    async def _write_evt(self, evt_id: str, **kwargs: typing.Any) -> None:
-        """Write an event message.
-
-        Parameters
-        ----------
-        evt_id : `str`
-            The name of the event, for instance ``evt_atMountState``.
-        kwargs : `typing.Any`
-            The data to include in the event message.
-        """
-        data = {"id": evt_id, **kwargs}
-        await self.cmd_evt_server.write_json(data=data)
-
-    async def _write_telemetry(
-        self, tel_id: str, timestamp: np.float64, data: typing.Any
-    ) -> None:
-        """Write a telemetry message.
-
-        Parameters
-        ----------
-        tel_id : `str`
-            The name of the telemetry.
-        timestamp : `np.float64`
-            The timestamp of the telemetry.
-        data : `typing.Any`
-            The data to include in the telemetry message.
-        """
-        data.cRIO_timestamp = timestamp.item()
-        data.id = tel_id
-        data_dict = vars(data)
-        await self.telemetry_server.write_json(data=data_dict)
-
     async def disable_all_drives(self) -> None:
         """Stop all drives, disable them and put on brakes."""
         self._tracking_enabled = False
@@ -1307,15 +1154,3 @@ class McsSimulator:
                 await self.update_telemetry()
 
             await asyncio.sleep(self._telemetry_interval / self._events_per_telemetry)
-
-    async def __aenter__(self) -> McsSimulator:
-        return self
-
-    async def __aexit__(
-        self,
-        type: typing.Type[BaseException],
-        value: BaseException,
-        traceback: types.TracebackType,
-    ) -> None:
-        await self.cmd_evt_server.close()
-        await self.telemetry_server.close()

@@ -26,6 +26,7 @@ test:
     - ts-dds
     - ts-idl {{ idl_version }}
     - ts-salobj {{ salobj_version }}
+    - ts-attcpip
     - ts-simactuators
     - ts-tcpip >=1.1.1
     - ts-utils
@@ -52,6 +53,7 @@ requirements:
     - python {{ python }}
     - ts-idl
     - ts-salobj
+    - ts-attcpip
     - ts-simactuators
     - ts-tcpip >=1.1.1
     - ts-utils
