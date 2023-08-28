@@ -50,6 +50,15 @@ CMD_ITEMS_TO_IGNORE = frozenset(
 class McsSimulator(attcpip.AtSimulator):
     """Simulate the ATMCS system.
 
+    Attributes
+    ----------
+    host : `str`
+        The simulator host.
+    cmd_evt_port : `int`
+        The command and events port.
+    telemetry_port : `int`
+        The telemetry port.
+
     Notes
     -----
     .. _axis:
@@ -77,8 +86,10 @@ class McsSimulator(attcpip.AtSimulator):
       * Otherwise neither switch is active
     """
 
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, host: str, cmd_evt_port: int, telemetry_port: int) -> None:
+        super().__init__(
+            host=host, cmd_evt_port=cmd_evt_port, telemetry_port=telemetry_port
+        )
 
         # Variables holding the data for the telemetry messages.
         self.azel_mountMotorEncoders = AzElMountMotorEncoders()
@@ -186,13 +197,11 @@ class McsSimulator(attcpip.AtSimulator):
         self._axis_enabled = np.zeros([5], dtype=bool)
         # Timer to kill tracking if trackTarget doesn't arrive in time.
 
-        # TODO DM-38912 Make this configurable.
         # Interval between telemetry updates (sec).
         self._telemetry_interval = 1
         # Number of event updates per telemetry update.
         self._events_per_telemetry = 10
 
-        # TODO DM-38912 Make this configurable.
         # Configuration items.
         self.max_tracking_interval = np.zeros(5)
         self.min_commanded_position = np.zeros(5)
@@ -216,7 +225,6 @@ class McsSimulator(attcpip.AtSimulator):
         schema_dir = pathlib.Path(__file__).parent / "schemas"
         attcpip.load_schemas(schema_dir=schema_dir)
 
-    # TODO DM-38912 Make this configurable.
     async def configure(
         self,
         max_tracking_interval: float = 2.5,
@@ -884,7 +892,6 @@ class McsSimulator(attcpip.AtSimulator):
             self.log.warning("Not connected.")
             return
         try:
-            # TODO DM-38912 Send "nitems" via configuration.
             nitems = 100
             curr_time = utils.current_tai()
 
