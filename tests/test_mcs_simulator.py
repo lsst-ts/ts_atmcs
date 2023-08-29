@@ -122,6 +122,8 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
     ) -> None:
         data = await client.read_json()
         assert attcpip.CommonCommandArgument.ID in data
+        while "evt" in data[attcpip.CommonCommandArgument.ID]:
+            data = await client.read_json()
         assert attcpip.CommonCommandArgument.SEQUENCE_ID in data
         assert data[attcpip.CommonCommandArgument.ID] == ack
         assert data[attcpip.CommonCommandArgument.SEQUENCE_ID] == sequence_id
