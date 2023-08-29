@@ -26,6 +26,7 @@ import asyncio
 from lsst.ts import attcpip, salobj
 
 from . import __version__
+from .config_schema import CONFIG_SCHEMA
 from .enums import Command
 from .mcs_simulator import McsSimulator
 
@@ -44,13 +45,31 @@ class ATMCSCsc(attcpip.AtTcpipCsc):
     # Append "-sim" to avoid confusion with the real ATMCS CSC.
     version = f"{__version__}-sim"
 
-    def __init__(self, initial_state: salobj.State = salobj.State.STANDBY) -> None:
+    def __init__(
+        self,
+        config_dir: str | None = None,
+        initial_state: salobj.State = salobj.State.STANDBY,
+    ) -> None:
         super().__init__(
-            name="ATMCS", index=0, initial_state=initial_state, simulation_mode=1
+            name="ATMCS",
+            index=0,
+            config_schema=CONFIG_SCHEMA,
+            config_dir=config_dir,
+            initial_state=initial_state,
+            simulation_mode=1,
         )
 
         # McsSimulator for simulation_mode == 1.
-        self.simulator = McsSimulator()
+        self.simulator: McsSimulator | None = None
+
+    async def start_clients(self) -> None:
+        if self.simulator is None:
+            self.simulator = McsSimulator(
+                host=self.config.host,
+                cmd_evt_port=self.config.cmd_evt_port,
+                telemetry_port=self.config.telemetry_port,
+            )
+        await super().start_clients()
 
     async def do_startTracking(self, data: salobj.BaseMsgType) -> None:
         self.assert_enabled("startTracking")

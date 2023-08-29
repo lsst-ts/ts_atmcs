@@ -48,7 +48,9 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
     async def create_mcs_simulator(
         self,
     ) -> typing.AsyncGenerator[atmcssimulator.McsSimulator, None]:
-        async with atmcssimulator.McsSimulator() as simulator:
+        async with atmcssimulator.McsSimulator(
+            host=tcpip.LOCALHOST_IPV4, cmd_evt_port=5000, telemetry_port=6000
+        ) as simulator:
             await simulator.cmd_evt_server.start_task
             await simulator.telemetry_server.start_task
             await simulator.configure()
@@ -120,6 +122,8 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
     ) -> None:
         data = await client.read_json()
         assert attcpip.CommonCommandArgument.ID in data
+        while "evt" in data[attcpip.CommonCommandArgument.ID]:
+            data = await client.read_json()
         assert attcpip.CommonCommandArgument.SEQUENCE_ID in data
         assert data[attcpip.CommonCommandArgument.ID] == ack
         assert data[attcpip.CommonCommandArgument.SEQUENCE_ID] == sequence_id
