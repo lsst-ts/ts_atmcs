@@ -30,6 +30,7 @@ from lsst.ts import attcpip, simactuators, tcpip, utils
 from lsst.ts.idl.enums.ATMCS import AtMountState, M3ExitPort, M3State
 
 from .dataclasses import (
+    AXIS_EVENT_DICT,
     AzElMountMotorEncoders,
     MeasuredMotorVelocity,
     MeasuredTorque,
@@ -133,55 +134,6 @@ class McsSimulator(attcpip.AtSimulator):
             M3ExitPort.NASMYTH2: PortInfo(1, M3State.NASMYTH2, Axis.NA2),
             M3ExitPort.PORT3: PortInfo(2, M3State.PORT3, None),
         }
-
-        # TODO DM-39469 Replace these tuples with a dict of new dataclasses.
-        # Name of minimum limit switch event for each axis.
-        self._min_lim_names = (
-            Event.ELEVATIONLIMITSWITCHLOWER,
-            Event.AZIMUTHLIMITSWITCHCW,
-            Event.NASMYTH1LIMITSWITCHCW,
-            Event.NASMYTH2LIMITSWITCHCW,
-            Event.M3ROTATORLIMITSWITCHCW,
-        )
-        # Name of maximum limit switch event for each axis.
-        self._max_lim_names = (
-            Event.ELEVATIONLIMITSWITCHUPPER,
-            Event.AZIMUTHLIMITSWITCHCCW,
-            Event.NASMYTH1LIMITSWITCHCCW,
-            Event.NASMYTH2LIMITSWITCHCCW,
-            Event.M3ROTATORLIMITSWITCHCCW,
-        )
-        # Name of "in position" event for each axis,
-        # excluding ``allAxesInPosition``.
-        self._in_position_names = (
-            Event.ELEVATIONINPOSITION,
-            Event.AZIMUTHINPOSITION,
-            Event.NASMYTH1ROTATORINPOSITION,
-            Event.NASMYTH2ROTATORINPOSITION,
-            Event.M3INPOSITION,
-        )
-        # Name of drive status events for each axis.
-        self._drive_status_names = (
-            (Event.ELEVATIONDRIVESTATUS,),
-            (
-                Event.AZIMUTHDRIVE1STATUS,
-                Event.AZIMUTHDRIVE2STATUS,
-            ),
-            (Event.NASMYTH1DRIVESTATUS,),
-            (Event.NASMYTH2DRIVESTATUS,),
-            (Event.M3DRIVESTATUS,),
-        )
-        # Name of brake events for each axis.
-        self._brake_names = (
-            (Event.ELEVATIONBRAKE,),
-            (
-                Event.AZIMUTHBRAKE1,
-                Event.AZIMUTHBRAKE2,
-            ),
-            (Event.NASMYTH1BRAKE,),
-            (Event.NASMYTH2BRAKE,),
-            (),
-        )
 
         # Has tracking been enabled by startTracking?
         # This remains true until stopTracking is called or the
@@ -749,13 +701,13 @@ class McsSimulator(attcpip.AtSimulator):
             abort_axes = []
             for axis in Axis:
                 await self._write_evt(
-                    evt_id=self._min_lim_names[axis],
+                    evt_id=AXIS_EVENT_DICT[axis].min_lim,
                     active=bool(
                         current_position[axis] < self.min_limit_switch_position[axis]
                     ),
                 )
                 await self._write_evt(
-                    evt_id=self._max_lim_names[axis],
+                    evt_id=AXIS_EVENT_DICT[axis].max_lim,
                     active=bool(
                         current_position[axis] > self.max_limit_switch_position[axis]
                     ),
@@ -780,14 +732,14 @@ class McsSimulator(attcpip.AtSimulator):
 
             # Handle brakes
             for axis in Axis:
-                for brake_name in self._brake_names[axis]:
+                for brake_name in AXIS_EVENT_DICT[axis].brake:
                     await self._write_evt(
                         evt_id=brake_name, engaged=bool(not self._axis_enabled[axis])
                     )
 
             # Handle drive status (which means enabled)
             for axis in Axis:
-                for evt_name in self._drive_status_names[axis]:
+                for evt_name in AXIS_EVENT_DICT[axis].drive_status:
                     await self._write_evt(
                         evt_id=evt_name, enable=bool(self._axis_enabled[axis])
                     )
@@ -827,7 +779,7 @@ class McsSimulator(attcpip.AtSimulator):
             if not self._tracking_enabled:
                 for axis in MainAxes:
                     await self._write_evt(
-                        evt_id=self._in_position_names[axis], inPosition=False
+                        evt_id=AXIS_EVENT_DICT[axis].in_position, inPosition=False
                     )
                 await self._write_evt(evt_id=Event.ALLAXESINPOSITION, inPosition=False)
             else:
@@ -841,7 +793,7 @@ class McsSimulator(attcpip.AtSimulator):
                     if not in_position and axis in axes_in_use:
                         all_in_position = False
                     await self._write_evt(
-                        evt_id=self._in_position_names[axis], inPosition=in_position
+                        evt_id=AXIS_EVENT_DICT[axis].in_position, inPosition=in_position
                     )
                 await self._write_evt(
                     evt_id=Event.ALLAXESINPOSITION, inPosition=all_in_position
