@@ -1,6 +1,6 @@
 # This file is part of ts_atmcssimulator.
 #
-# Developed for the Vera Rubin Observatory Telescope and Site Systems.
+# # Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
 # This product includes software developed by the LSST Project
 # (https://www.lsst.org).
 # See the COPYRIGHT file at the top-level directory of this distribution
@@ -20,6 +20,8 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 __all__ = [
+    "AXIS_EVENT_DICT",
+    "PORT_INFO_DICT",
     "AzElMountMotorEncoders",
     "MeasuredMotorVelocity",
     "MeasuredTorque",
@@ -32,6 +34,10 @@ __all__ = [
 ]
 
 from dataclasses import dataclass, field
+
+from lsst.ts.xml.enums.ATMCS import M3ExitPort, M3State
+
+from .enums import Axis, Event
 
 
 def one_hundred_zeros() -> list[float]:
@@ -327,3 +333,78 @@ class Trajectory(Timestamp):
     nasmyth1RotatorAngleVelocity: list[float] = field(default_factory=one_hundred_zeros)
     nasmyth2RotatorAngle: list[float] = field(default_factory=one_hundred_zeros)
     nasmyth2RotatorAngleVelocity: list[float] = field(default_factory=one_hundred_zeros)
+
+
+@dataclass
+class AxisEventInformation:
+    """Dataclass holding axis event information.
+
+    Attributes
+    ----------
+    min_lim : `Event`
+        The minimum limit switch event.
+    max_lim : `Event`
+        The maximum limit switch event.
+    in_position : `Event`
+        The in position event.
+    drive_status : `set`[`Event`]
+        The set of drive status events.
+    brake : `set`[`Event`]
+        The set of brake events.
+    """
+
+    min_lim: Event
+    max_lim: Event
+    in_position: Event
+    drive_status: set[Event]
+    brake: set[Event]
+
+
+# Dictionary with the AxisEventInformation for all Axes.
+AXIS_EVENT_DICT = {
+    Axis.Elevation: AxisEventInformation(
+        min_lim=Event.ELEVATIONLIMITSWITCHLOWER,
+        max_lim=Event.ELEVATIONLIMITSWITCHUPPER,
+        in_position=Event.ELEVATIONINPOSITION,
+        drive_status={Event.ELEVATIONDRIVESTATUS},
+        brake={Event.ELEVATIONBRAKE},
+    ),
+    Axis.Azimuth: AxisEventInformation(
+        min_lim=Event.AZIMUTHLIMITSWITCHCW,
+        max_lim=Event.AZIMUTHLIMITSWITCHCCW,
+        in_position=Event.AZIMUTHINPOSITION,
+        drive_status={
+            Event.AZIMUTHDRIVE1STATUS,
+            Event.AZIMUTHDRIVE2STATUS,
+        },
+        brake={Event.AZIMUTHBRAKE1, Event.AZIMUTHBRAKE2},
+    ),
+    Axis.NA1: AxisEventInformation(
+        min_lim=Event.NASMYTH1LIMITSWITCHCW,
+        max_lim=Event.NASMYTH1LIMITSWITCHCCW,
+        in_position=Event.NASMYTH1ROTATORINPOSITION,
+        drive_status={Event.NASMYTH1DRIVESTATUS},
+        brake={Event.NASMYTH1BRAKE},
+    ),
+    Axis.NA2: AxisEventInformation(
+        min_lim=Event.NASMYTH2LIMITSWITCHCW,
+        max_lim=Event.NASMYTH2LIMITSWITCHCCW,
+        in_position=Event.NASMYTH2ROTATORINPOSITION,
+        drive_status={Event.NASMYTH2DRIVESTATUS},
+        brake={Event.NASMYTH2BRAKE},
+    ),
+    Axis.M3: AxisEventInformation(
+        min_lim=Event.M3ROTATORLIMITSWITCHCW,
+        max_lim=Event.M3ROTATORLIMITSWITCHCCW,
+        in_position=Event.M3INPOSITION,
+        drive_status={Event.M3DRIVESTATUS},
+        brake=set(),
+    ),
+}
+
+
+PORT_INFO_DICT = {
+    M3ExitPort.NASMYTH1: PortInfo(0, M3State.NASMYTH1, Axis.NA1),
+    M3ExitPort.NASMYTH2: PortInfo(1, M3State.NASMYTH2, Axis.NA2),
+    M3ExitPort.PORT3: PortInfo(2, M3State.PORT3, None),
+}

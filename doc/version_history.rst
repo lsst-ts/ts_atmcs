@@ -15,6 +15,7 @@ v2.0.0
 * Move simulation code mostly unchanged from the CSC to the simulator.
 * Remove all simulator code from the CSC and connect to the simulator via TCP/IP.
 * Make ATMCSCsc a Configurable CSC.
+* Reorganize constants and event information.
 
 Requires:
 

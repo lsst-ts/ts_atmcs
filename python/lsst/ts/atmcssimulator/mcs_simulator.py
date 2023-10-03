@@ -1,6 +1,6 @@
 # This file is part of ts_atmcssimulator.
 #
-# Developed for the Vera Rubin Observatory Telescope and Site Systems.
+# # Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
 # This product includes software developed by the LSST Project
 # (https://www.lsst.org).
 # See the COPYRIGHT file at the top-level directory of this distribution
@@ -27,9 +27,11 @@ import typing
 
 import numpy as np
 from lsst.ts import attcpip, simactuators, tcpip, utils
-from lsst.ts.idl.enums.ATMCS import AtMountState, M3ExitPort, M3State
+from lsst.ts.idl.enums.ATMCS import AtMountState, M3State
 
 from .dataclasses import (
+    AXIS_EVENT_DICT,
+    PORT_INFO_DICT,
     AzElMountMotorEncoders,
     MeasuredMotorVelocity,
     MeasuredTorque,
@@ -123,66 +125,6 @@ class McsSimulator(attcpip.AtSimulator):
         # Timer to kill tracking if trackTarget doesn't arrive in time.
         self._kill_tracking_timer = utils.make_done_future()
 
-        # Dict of M3ExitPort (the instrument port M3 points to):
-        # * index of self.m3_port_positions: the M3 position for this port
-        # * M3State (state of M3 axis when pointing to this port)
-        # * Rotator axis at this port, as an Axis enum,
-        #   or None if this port has no rotator.
-        self._port_info_dict = {
-            M3ExitPort.NASMYTH1: PortInfo(0, M3State.NASMYTH1, Axis.NA1),
-            M3ExitPort.NASMYTH2: PortInfo(1, M3State.NASMYTH2, Axis.NA2),
-            M3ExitPort.PORT3: PortInfo(2, M3State.PORT3, None),
-        }
-
-        # TODO DM-39469 Replace these tuples with a dict of new dataclasses.
-        # Name of minimum limit switch event for each axis.
-        self._min_lim_names = (
-            Event.ELEVATIONLIMITSWITCHLOWER,
-            Event.AZIMUTHLIMITSWITCHCW,
-            Event.NASMYTH1LIMITSWITCHCW,
-            Event.NASMYTH2LIMITSWITCHCW,
-            Event.M3ROTATORLIMITSWITCHCW,
-        )
-        # Name of maximum limit switch event for each axis.
-        self._max_lim_names = (
-            Event.ELEVATIONLIMITSWITCHUPPER,
-            Event.AZIMUTHLIMITSWITCHCCW,
-            Event.NASMYTH1LIMITSWITCHCCW,
-            Event.NASMYTH2LIMITSWITCHCCW,
-            Event.M3ROTATORLIMITSWITCHCCW,
-        )
-        # Name of "in position" event for each axis,
-        # excluding ``allAxesInPosition``.
-        self._in_position_names = (
-            Event.ELEVATIONINPOSITION,
-            Event.AZIMUTHINPOSITION,
-            Event.NASMYTH1ROTATORINPOSITION,
-            Event.NASMYTH2ROTATORINPOSITION,
-            Event.M3INPOSITION,
-        )
-        # Name of drive status events for each axis.
-        self._drive_status_names = (
-            (Event.ELEVATIONDRIVESTATUS,),
-            (
-                Event.AZIMUTHDRIVE1STATUS,
-                Event.AZIMUTHDRIVE2STATUS,
-            ),
-            (Event.NASMYTH1DRIVESTATUS,),
-            (Event.NASMYTH2DRIVESTATUS,),
-            (Event.M3DRIVESTATUS,),
-        )
-        # Name of brake events for each axis.
-        self._brake_names = (
-            (Event.ELEVATIONBRAKE,),
-            (
-                Event.AZIMUTHBRAKE1,
-                Event.AZIMUTHBRAKE2,
-            ),
-            (Event.NASMYTH1BRAKE,),
-            (Event.NASMYTH2BRAKE,),
-            (),
-        )
-
         # Has tracking been enabled by startTracking?
         # This remains true until stopTracking is called or the
         # summary state is no longer salobj.State.Enabled,
@@ -218,7 +160,7 @@ class McsSimulator(attcpip.AtSimulator):
         self.nsettle = 0
         self.limit_overtravel = 0
         self.actuators: list[simactuators.TrackingActuator] = []
-        # allowed position error for M3 to be considered in position (deg)
+        # allowed position error for M3 to be considered in position (deg).
         self.m3tolerance = 1e-5
 
     def load_schemas(self) -> None:
@@ -416,7 +358,7 @@ class McsSimulator(attcpip.AtSimulator):
             await self.write_fail_response(sequence_id=sequence_id)
             return
         try:
-            m3_port_positions_ind = self._port_info_dict[port].index
+            m3_port_positions_ind = PORT_INFO_DICT[port].index
         except KeyError:
             await self.write_fail_response(sequence_id=sequence_id)
             return
@@ -637,7 +579,7 @@ class McsSimulator(attcpip.AtSimulator):
         if not self.m3_in_position(tai):
             return (None, None)
         target_position = self.actuators[Axis.M3].target.position
-        for exit_port, port_info in self._port_info_dict.items():
+        for exit_port, port_info in PORT_INFO_DICT.items():
             if self.m3_port_positions[port_info.index] == target_position:
                 return (exit_port, port_info.axis)
         return (None, None)
@@ -749,13 +691,13 @@ class McsSimulator(attcpip.AtSimulator):
             abort_axes = []
             for axis in Axis:
                 await self._write_evt(
-                    evt_id=self._min_lim_names[axis],
+                    evt_id=AXIS_EVENT_DICT[axis].min_lim,
                     active=bool(
                         current_position[axis] < self.min_limit_switch_position[axis]
                     ),
                 )
                 await self._write_evt(
-                    evt_id=self._max_lim_names[axis],
+                    evt_id=AXIS_EVENT_DICT[axis].max_lim,
                     active=bool(
                         current_position[axis] > self.max_limit_switch_position[axis]
                     ),
@@ -780,14 +722,14 @@ class McsSimulator(attcpip.AtSimulator):
 
             # Handle brakes
             for axis in Axis:
-                for brake_name in self._brake_names[axis]:
+                for brake_name in AXIS_EVENT_DICT[axis].brake:
                     await self._write_evt(
                         evt_id=brake_name, engaged=bool(not self._axis_enabled[axis])
                     )
 
             # Handle drive status (which means enabled)
             for axis in Axis:
-                for evt_name in self._drive_status_names[axis]:
+                for evt_name in AXIS_EVENT_DICT[axis].drive_status:
                     await self._write_evt(
                         evt_id=evt_name, enable=bool(self._axis_enabled[axis])
                     )
@@ -827,7 +769,7 @@ class McsSimulator(attcpip.AtSimulator):
             if not self._tracking_enabled:
                 for axis in MainAxes:
                     await self._write_evt(
-                        evt_id=self._in_position_names[axis], inPosition=False
+                        evt_id=AXIS_EVENT_DICT[axis].in_position, inPosition=False
                     )
                 await self._write_evt(evt_id=Event.ALLAXESINPOSITION, inPosition=False)
             else:
@@ -841,7 +783,7 @@ class McsSimulator(attcpip.AtSimulator):
                     if not in_position and axis in axes_in_use:
                         all_in_position = False
                     await self._write_evt(
-                        evt_id=self._in_position_names[axis], inPosition=in_position
+                        evt_id=AXIS_EVENT_DICT[axis].in_position, inPosition=in_position
                     )
                 await self._write_evt(
                     evt_id=Event.ALLAXESINPOSITION, inPosition=all_in_position
@@ -858,7 +800,7 @@ class McsSimulator(attcpip.AtSimulator):
                 # value.
                 # TODO: DM-36825 Remove mapping once the enumeration values
                 # match.
-                m3_state = self._port_info_dict.get(
+                m3_state = PORT_INFO_DICT.get(
                     exit_port, PortInfo(None, M3State.UNKNOWNPOSITION, None)
                 ).m3state
             elif m3actuator.kind(tai) == m3actuator.Kind.Slewing:
