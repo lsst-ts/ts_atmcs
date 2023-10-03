@@ -21,6 +21,7 @@
 
 __all__ = [
     "AXIS_EVENT_DICT",
+    "PORT_INFO_DICT",
     "AzElMountMotorEncoders",
     "MeasuredMotorVelocity",
     "MeasuredTorque",
@@ -33,6 +34,8 @@ __all__ = [
 ]
 
 from dataclasses import dataclass, field
+
+from lsst.ts.xml.enums.ATMCS import M3ExitPort, M3State
 
 from .enums import Axis, Event
 
@@ -397,4 +400,11 @@ AXIS_EVENT_DICT = {
         drive_status={Event.M3DRIVESTATUS},
         brake=set(),
     ),
+}
+
+
+PORT_INFO_DICT = {
+    M3ExitPort.NASMYTH1: PortInfo(0, M3State.NASMYTH1, Axis.NA1),
+    M3ExitPort.NASMYTH2: PortInfo(1, M3State.NASMYTH2, Axis.NA2),
+    M3ExitPort.PORT3: PortInfo(2, M3State.PORT3, None),
 }

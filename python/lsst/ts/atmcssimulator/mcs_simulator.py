@@ -27,10 +27,11 @@ import typing
 
 import numpy as np
 from lsst.ts import attcpip, simactuators, tcpip, utils
-from lsst.ts.idl.enums.ATMCS import AtMountState, M3ExitPort, M3State
+from lsst.ts.idl.enums.ATMCS import AtMountState, M3State
 
 from .dataclasses import (
     AXIS_EVENT_DICT,
+    PORT_INFO_DICT,
     AzElMountMotorEncoders,
     MeasuredMotorVelocity,
     MeasuredTorque,
@@ -124,17 +125,6 @@ class McsSimulator(attcpip.AtSimulator):
         # Timer to kill tracking if trackTarget doesn't arrive in time.
         self._kill_tracking_timer = utils.make_done_future()
 
-        # Dict of M3ExitPort (the instrument port M3 points to):
-        # * index of self.m3_port_positions: the M3 position for this port
-        # * M3State (state of M3 axis when pointing to this port)
-        # * Rotator axis at this port, as an Axis enum,
-        #   or None if this port has no rotator.
-        self._port_info_dict = {
-            M3ExitPort.NASMYTH1: PortInfo(0, M3State.NASMYTH1, Axis.NA1),
-            M3ExitPort.NASMYTH2: PortInfo(1, M3State.NASMYTH2, Axis.NA2),
-            M3ExitPort.PORT3: PortInfo(2, M3State.PORT3, None),
-        }
-
         # Has tracking been enabled by startTracking?
         # This remains true until stopTracking is called or the
         # summary state is no longer salobj.State.Enabled,
@@ -170,7 +160,7 @@ class McsSimulator(attcpip.AtSimulator):
         self.nsettle = 0
         self.limit_overtravel = 0
         self.actuators: list[simactuators.TrackingActuator] = []
-        # allowed position error for M3 to be considered in position (deg)
+        # allowed position error for M3 to be considered in position (deg).
         self.m3tolerance = 1e-5
 
     def load_schemas(self) -> None:
@@ -368,7 +358,7 @@ class McsSimulator(attcpip.AtSimulator):
             await self.write_fail_response(sequence_id=sequence_id)
             return
         try:
-            m3_port_positions_ind = self._port_info_dict[port].index
+            m3_port_positions_ind = PORT_INFO_DICT[port].index
         except KeyError:
             await self.write_fail_response(sequence_id=sequence_id)
             return
@@ -589,7 +579,7 @@ class McsSimulator(attcpip.AtSimulator):
         if not self.m3_in_position(tai):
             return (None, None)
         target_position = self.actuators[Axis.M3].target.position
-        for exit_port, port_info in self._port_info_dict.items():
+        for exit_port, port_info in PORT_INFO_DICT.items():
             if self.m3_port_positions[port_info.index] == target_position:
                 return (exit_port, port_info.axis)
         return (None, None)
@@ -810,7 +800,7 @@ class McsSimulator(attcpip.AtSimulator):
                 # value.
                 # TODO: DM-36825 Remove mapping once the enumeration values
                 # match.
-                m3_state = self._port_info_dict.get(
+                m3_state = PORT_INFO_DICT.get(
                     exit_port, PortInfo(None, M3State.UNKNOWNPOSITION, None)
                 ).m3state
             elif m3actuator.kind(tai) == m3actuator.Kind.Slewing:
