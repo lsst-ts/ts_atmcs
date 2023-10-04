@@ -109,6 +109,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                     "softwareVersions",  # already read
                     "logMessage",  # not reliably output
                     "detailedState",  # not output by the simulator
+                    "configurationApplied",  # not supported in v1.5
+                    "configurationsAvailable",  # not supported in v1.5
                 ):
                     continue
                 with self.subTest(event_name=event_name):
