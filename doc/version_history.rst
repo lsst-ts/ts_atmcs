@@ -6,6 +6,11 @@
 Version History
 ###############
 
+v1.5.4
+------
+
+* Update unit tests to work with latest version of the xml.
+
 v1.5.3
 ------
 
