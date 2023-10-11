@@ -16,6 +16,7 @@ v2.0.0
 * Remove all simulator code from the CSC and connect to the simulator via TCP/IP.
 * Make ATMCSCsc a Configurable CSC.
 * Reorganize constants and event information.
+* Add support for sending start, disable, enable and standby commands.
 
 Requires:
 
