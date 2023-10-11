@@ -26,7 +26,7 @@ from typing import Any
 
 import numpy as np
 import pytest
-from lsst.ts import atmcssimulator, salobj, simactuators, utils
+from lsst.ts import atmcssimulator, attcpip, salobj, simactuators, utils
 from lsst.ts.idl.enums.ATMCS import AtMountState, M3ExitPort, M3State
 
 STD_TIMEOUT = 10.0  # standard timeout, seconds.
@@ -767,3 +767,18 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             target_kwargs[axis_name] = segment.position
             target_kwargs[f"{axis_name}Velocity"] = segment.velocity
         return target_kwargs
+
+    async def test_csc_state_commands(self) -> None:
+        async with self.make_csc(initial_state=salobj.State.STANDBY):
+            await self.remote.cmd_start.set_start()
+            await self.csc.simulator.configure()
+            assert self.csc.simulator.simulator_state == attcpip.SimulatorState.DISABLED
+
+            await self.remote.cmd_enable.start()
+            assert self.csc.simulator.simulator_state == attcpip.SimulatorState.ENABLED
+
+            await self.remote.cmd_disable.start()
+            assert self.csc.simulator.simulator_state == attcpip.SimulatorState.DISABLED
+
+            await self.remote.cmd_standby.start()
+            assert self.csc.simulator.simulator_state == attcpip.SimulatorState.STANDBY
