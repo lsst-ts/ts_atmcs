@@ -344,3 +344,37 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
                 # fail as well.
                 json_schema = attcpip.registry[f"{data['id']}"]
                 jsonschema.validate(data, json_schema)
+
+    async def test_stimulator_state_commands(self) -> None:
+        async with self.create_mcs_simulator() as simulator, self.create_cmd_evt_client(
+            simulator
+        ) as cmd_evt_client:
+            assert simulator.simulator_state == attcpip.SimulatorState.STANDBY
+
+            sequence_id = 0
+            commands_and_expected_states = {
+                attcpip.CommonCommand.START: attcpip.SimulatorState.DISABLED,
+                attcpip.CommonCommand.ENABLE: attcpip.SimulatorState.ENABLED,
+                attcpip.CommonCommand.DISABLE: attcpip.SimulatorState.DISABLED,
+                attcpip.CommonCommand.STANDBY: attcpip.SimulatorState.STANDBY,
+            }
+
+            for command in commands_and_expected_states:
+                sequence_id = sequence_id + 1
+                await cmd_evt_client.write_json(
+                    data={
+                        attcpip.CommonCommandArgument.ID: command,
+                        attcpip.CommonCommandArgument.SEQUENCE_ID: sequence_id,
+                    }
+                )
+                await self.verify_command_response(
+                    client=cmd_evt_client, ack=attcpip.Ack.ACK, sequence_id=sequence_id
+                )
+                await self.verify_command_response(
+                    client=cmd_evt_client,
+                    ack=attcpip.Ack.SUCCESS,
+                    sequence_id=sequence_id,
+                )
+                assert (
+                    simulator.simulator_state == commands_and_expected_states[command]
+                )

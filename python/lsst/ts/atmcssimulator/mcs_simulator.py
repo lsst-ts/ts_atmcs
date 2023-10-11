@@ -44,10 +44,6 @@ from .dataclasses import (
 )
 from .enums import Axis, Command, Event, MainAxes, Telemetry
 
-CMD_ITEMS_TO_IGNORE = frozenset(
-    {attcpip.CommonCommandArgument.ID, attcpip.CommonCommandArgument.VALUE}
-)
-
 
 class McsSimulator(attcpip.AtSimulator):
     """Simulate the ATMCS system.
@@ -109,7 +105,7 @@ class McsSimulator(attcpip.AtSimulator):
         self.last_sequence_id = 0
 
         # Dict of command: function.
-        self.dispatch_dict: dict[str, typing.Callable] = {
+        self.dispatch_dict: dict[str, typing.Callable] = self.dispatch_dict | {
             Command.SET_INSTRUMENT_PORT: self.do_set_instrument_port,
             Command.START_TRACKING: self.do_start_tracking,
             Command.STOP_TRACKING: self.do_stop_tracking,
@@ -164,6 +160,7 @@ class McsSimulator(attcpip.AtSimulator):
         self.m3tolerance = 1e-5
 
     def load_schemas(self) -> None:
+        super().load_schemas()
         schema_dir = pathlib.Path(__file__).parent / "schemas"
         attcpip.load_schemas(schema_dir=schema_dir)
 
@@ -310,37 +307,6 @@ class McsSimulator(attcpip.AtSimulator):
             await self.start_tasks()
         else:
             await self.stop_tasks()
-
-    async def cmd_evt_dispatch_callback(self, data: dict[str, typing.Any]) -> None:
-        """Asynchronous function to call when data are read and dispatched.
-
-        The received data are validated and then dispatched to the
-        corresponding function as listed in ``self.dispatch_dict``. If the data
-        are invalid then a ``noack`` response is sent back to the client and
-        the data are not dispatched.
-
-        Parameters
-        ----------
-        data : `dict`[`str`, `typing.Any`]
-            The data sent to the server.
-        """
-        data_ok = await self.verify_data(data=data)
-        if not data_ok:
-            await self.write_noack_response(
-                sequence_id=data[attcpip.CommonCommandArgument.SEQUENCE_ID]
-            )
-            return
-
-        await self.write_ack_response(
-            sequence_id=data[attcpip.CommonCommandArgument.SEQUENCE_ID]
-        )
-
-        cmd = data[attcpip.CommonCommandArgument.ID]
-        func = self.dispatch_dict[cmd]
-        kwargs = {
-            key: value for key, value in data.items() if key not in CMD_ITEMS_TO_IGNORE
-        }
-        await func(**kwargs)
 
     async def do_set_instrument_port(self, *, sequence_id: int, port: int) -> None:
         """Set the M3 instrument port.
