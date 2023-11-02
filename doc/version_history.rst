@@ -6,6 +6,11 @@
 Version History
 ###############
 
+v1.5.5
+------
+
+* In ``tests/test_csc.py``, update all topic retrievals to use ``assert_next_sample``, this allows the kafka version of salobj to handle discarding old samples.
+
 v1.5.4
 ------
 
