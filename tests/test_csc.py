@@ -161,7 +161,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
             # The rejected target should not be output as an event.
             with pytest.raises(asyncio.TimeoutError):
-                await self.remote.evt_target.next(flush=False, timeout=0.1)
+                await self.assert_next_sample(
+                    self.remote.evt_target, flush=False, timeout=0.1
+                )
 
             # Enable tracking and try again; this time it should work.
             await self.remote.cmd_startTracking.start(timeout=STD_TIMEOUT)
@@ -482,7 +484,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 )
                 await self.remote.cmd_trackTarget.set_start(**target_kwargs, timeout=1)
 
-                target = await self.remote.evt_target.next(flush=False, timeout=1)
+                target = await self.assert_next_sample(
+                    self.remote.evt_target, flush=False, timeout=1
+                )
                 self.assertTargetsAlmostEqual(self.remote.cmd_trackTarget.data, target)
 
                 data = self.remote.evt_allAxesInPosition.get()
