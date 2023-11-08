@@ -6,6 +6,29 @@
 Version History
 ###############
 
+v1.5.5
+------
+
+* In ``tests/test_csc.py``, update all topic retrievals to use ``assert_next_sample``, this allows the kafka version of salobj to handle discarding old samples.
+
+v1.5.4
+------
+
+* Update unit tests to work with latest version of the xml.
+
+v1.5.3
+------
+
+* Use ts_pre_commit_conf.
+
+Requires:
+
+* ts_salobj 7.1
+* ts_utils 1
+* ts_simactuators 2
+* ts_idl 2
+* IDL file for ATMCS built from ts_xml 11
+
 v1.5.2
 ------
 
