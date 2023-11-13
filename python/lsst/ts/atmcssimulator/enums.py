@@ -118,6 +118,6 @@ class Telemetry(str, enum.Enum):
     MEASURED_TORQUE = "tel_measuredTorque"
     MOUNT_AZEL_ENCODERS = "tel_mount_AzEl_Encoders"
     MOUNT_NASMYTH_ENCODERS = "tel_mount_Nasmyth_Encoders"
-    NASMYTH_M3_MOUNT_MOTOR_ENCODERS = "tel_nasymth_m3_mountMotorEncoders"
+    NASMYTH_M3_MOUNT_MOTOR_ENCODERS = "tel_nasmyth_m3_mountMotorEncoders"
     TORQUE_DEMAND = "tel_torqueDemand"
     TRAJECTORY = "tel_trajectory"
