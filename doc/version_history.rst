@@ -17,6 +17,7 @@ v2.0.0
 * Make ATMCSCsc a Configurable CSC.
 * Reorganize constants and event information.
 * Add support for sending start, disable, enable and standby commands.
+* Fix typo in the "ATMCS_nasmyth_m3_mountMotorEncoders" telemetry topic name.
 
 Requires:
 
