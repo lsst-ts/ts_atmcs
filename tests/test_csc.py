@@ -189,8 +189,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
             # The rejected target should not be output as an event.
             with pytest.raises(asyncio.TimeoutError):
-                await self.remote.evt_target.next(
-                    flush=False, timeout=VERY_SHORT_TIMEOUT
+                await self.assert_next_sample(
+                    self.remote.evt_target, flush=False, timeout=VERY_SHORT_TIMEOUT
                 )
 
             # Enable tracking and try again; this time it should work.
@@ -522,8 +522,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                     **target_kwargs, timeout=SHORT_TIMEOUT
                 )
 
-                target = await self.remote.evt_target.next(
-                    flush=False, timeout=SHORT_TIMEOUT
+                target = await self.assert_next_sample(
+                    self.remote.evt_target, flush=False, timeout=SHORT_TIMEOUT
                 )
                 self.assertTargetsAlmostEqual(self.remote.cmd_trackTarget.data, target)
 
@@ -539,8 +539,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             print(f"test_track slew took {utils.current_tai() - start_tai:0.2f} sec")
 
             with pytest.raises(asyncio.TimeoutError):
-                await self.remote.evt_target.next(
-                    flush=False, timeout=VERY_SHORT_TIMEOUT
+                await self.assert_next_sample(
+                    self.remote.evt_target, flush=False, timeout=VERY_SHORT_TIMEOUT
                 )
 
             for event in self.in_position_events:
