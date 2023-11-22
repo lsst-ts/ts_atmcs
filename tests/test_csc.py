@@ -26,8 +26,9 @@ from typing import Any
 
 import numpy as np
 import pytest
-from lsst.ts import atmcssimulator, attcpip, salobj, simactuators, utils
-from lsst.ts.idl.enums.ATMCS import AtMountState, M3ExitPort, M3State
+from lsst.ts import atmcssimulator, salobj, simactuators, utils
+from lsst.ts.xml import sal_enums
+from lsst.ts.xml.enums.ATMCS import AtMountState, M3ExitPort, M3State
 
 STD_TIMEOUT = 10.0  # standard timeout, seconds.
 
@@ -512,11 +513,11 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                     tai=start_tai, position=1, velocity=-0.001
                 ),
             )
-            trackId = 20  # arbitary
+            track_id = 20  # arbitary
             while True:
                 tai = utils.current_tai() + 0.1  # offset is arbitrary but reasonable
                 target_kwargs = self.compute_track_target_kwargs(
-                    tai=tai, path_dict=path_dict, trackId=trackId
+                    tai=tai, path_dict=path_dict, track_id=track_id
                 )
                 await self.remote.cmd_trackTarget.set_start(
                     **target_kwargs, timeout=SHORT_TIMEOUT
@@ -643,11 +644,11 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                     tai=start_tai, position=90
                 ),
             )
-            trackId = 35  # arbitary
+            track_id = 35  # arbitary
 
             tai = start_tai + 0.1  # offset is arbitrary but reasonable
             target_kwargs = self.compute_track_target_kwargs(
-                tai=tai, path_dict=path_dict, trackId=trackId
+                tai=tai, path_dict=path_dict, track_id=track_id
             )
             await self.remote.cmd_trackTarget.set_start(
                 **target_kwargs, timeout=SHORT_TIMEOUT
@@ -696,11 +697,11 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                     tai=start_tai, position=90
                 ),
             )
-            trackId = 35  # arbitary
+            track_id = 35  # arbitary
 
             tai = start_tai + 0.1  # offset is arbitrary but reasonable
             target_kwargs = self.compute_track_target_kwargs(
-                tai=tai, path_dict=path_dict, trackId=trackId
+                tai=tai, path_dict=path_dict, track_id=track_id
             )
             await self.remote.cmd_trackTarget.set_start(
                 **target_kwargs, timeout=SHORT_TIMEOUT
@@ -747,7 +748,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             assert getattr(target1, field) == pytest.approx(getattr(target2, field))
 
     def compute_track_target_kwargs(
-        self, tai: float, path_dict: dict[str, Any], trackId: int
+        self, tai: float, path_dict: dict[str, Any], track_id: int
     ) -> dict[str, Any]:
         """Compute keyword arguments for the trackTarget command.
 
@@ -758,10 +759,10 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         path_dict : `dict`
             Dict of axis name: path (an lsst.ts.simactuators.path.Path
             or PathSegment).
-        trackId : `int`
+        track_id : `int`
             Tracking ID.
         """
-        target_kwargs = dict(taiTime=tai, trackId=trackId)
+        target_kwargs = dict(taiTime=tai, trackId=track_id)
         for axis_name, path in path_dict.items():
             segment = path.at(tai)
             target_kwargs[axis_name] = segment.position
@@ -770,15 +771,43 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
     async def test_csc_state_commands(self) -> None:
         async with self.make_csc(initial_state=salobj.State.STANDBY):
-            await self.remote.cmd_start.set_start()
+            await self.remote.cmd_start.start()
             await self.csc.simulator.configure()
-            assert self.csc.simulator.simulator_state == attcpip.SimulatorState.DISABLED
+            assert self.csc.simulator.simulator_state == sal_enums.State.DISABLED
 
             await self.remote.cmd_enable.start()
-            assert self.csc.simulator.simulator_state == attcpip.SimulatorState.ENABLED
+            assert self.csc.simulator.simulator_state == sal_enums.State.ENABLED
 
             await self.remote.cmd_disable.start()
-            assert self.csc.simulator.simulator_state == attcpip.SimulatorState.DISABLED
+            assert self.csc.simulator.simulator_state == sal_enums.State.DISABLED
 
             await self.remote.cmd_standby.start()
-            assert self.csc.simulator.simulator_state == attcpip.SimulatorState.STANDBY
+            assert self.csc.simulator.simulator_state == sal_enums.State.STANDBY
+
+            await self.remote.cmd_start.start()
+            assert self.csc.simulator.simulator_state == sal_enums.State.DISABLED
+
+            await self.remote.cmd_enable.start()
+            assert self.csc.simulator.simulator_state == sal_enums.State.ENABLED
+
+            await self.remote.cmd_disable.start()
+            assert self.csc.simulator.simulator_state == sal_enums.State.DISABLED
+
+            await self.remote.cmd_standby.start()
+            assert self.csc.simulator.simulator_state == sal_enums.State.STANDBY
+
+    async def test_csc_with_fault_state(self) -> None:
+        async with self.make_csc(initial_state=salobj.State.STANDBY):
+            await self.remote.cmd_start.start()
+            await self.csc.simulator.configure()
+            assert self.csc.simulator.simulator_state == sal_enums.State.DISABLED
+
+            await self.remote.cmd_standby.start()
+            assert self.csc.simulator.simulator_state == sal_enums.State.STANDBY
+
+            self.csc.simulator.go_to_fault_state = True
+            await self.remote.cmd_start.set_start()
+            assert self.csc.simulator.simulator_state == sal_enums.State.FAULT
+
+            await self.remote.cmd_standby.set_start()
+            assert self.csc.simulator.simulator_state == sal_enums.State.STANDBY
