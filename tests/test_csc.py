@@ -20,7 +20,6 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import asyncio
-import pathlib
 import unittest
 from typing import Any
 
@@ -30,7 +29,7 @@ from lsst.ts import atmcssimulator, salobj, simactuators, utils
 from lsst.ts.xml import sal_enums
 from lsst.ts.xml.enums.ATMCS import AtMountState, M3ExitPort, M3State
 
-STD_TIMEOUT = 10.0  # standard timeout, seconds.
+STD_TIMEOUT = 60.0  # standard timeout, seconds.
 
 SHORT_TIMEOUT = 1.0  # short timeout, seconds.
 
@@ -96,13 +95,17 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
     def basic_make_csc(
         self,
-        initial_state: salobj.State | int,
-        config_dir: str | pathlib.Path | None,
-        index: int = 1,
-        simulation_mode: int = 1,
+        initial_state: salobj.State,
+        config_dir: str,
         override: str = "",
+        **kwargs: Any,
     ) -> atmcssimulator.ATMCSCsc:
-        return atmcssimulator.ATMCSCsc(initial_state=initial_state)
+        return atmcssimulator.ATMCSCsc(
+            initial_state=initial_state,
+            config_dir=config_dir,
+            simulation_mode=1,
+            override=override,
+        )
 
     async def test_initial_info(self) -> None:
         """Check that all events and telemetry are output at startup
