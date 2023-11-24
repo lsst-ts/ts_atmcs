@@ -27,6 +27,7 @@ import unittest
 
 import jsonschema
 from lsst.ts import atmcssimulator, attcpip, tcpip, utils
+from lsst.ts.xml import sal_enums
 
 # Standard timeout in seconds.
 TIMEOUT = 2
@@ -46,11 +47,12 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
 
     @contextlib.asynccontextmanager
     async def create_mcs_simulator(
-        self,
+        self, go_to_fault_state: bool
     ) -> typing.AsyncGenerator[atmcssimulator.McsSimulator, None]:
         async with atmcssimulator.McsSimulator(
             host=tcpip.LOCALHOST_IPV4, cmd_evt_port=5000, telemetry_port=6000
         ) as simulator:
+            simulator.go_to_fault_state = go_to_fault_state
             await simulator.cmd_evt_server.start_task
             await simulator.telemetry_server.start_task
             await simulator.configure()
@@ -100,17 +102,17 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
         evt_name: str,
     ) -> None:
         data = await client.read_json()
-        assert "id" in data
-        assert data["id"] == evt_name
+        assert attcpip.CommonCommandArgument.ID in data
+        assert data[attcpip.CommonCommandArgument.ID] == evt_name
 
     async def verify_almost_all_events(self, client: tcpip.Client) -> None:
-        for i in range(len(EVENTS_TO_EXPECT)):
+        for _ in range(len(EVENTS_TO_EXPECT)):
             data = await client.read_json()
             # No need for asserts here. If the data id is not present in
             # registry or the validation of the schema fails, the test will
             # fail as well.
             json_schema = attcpip.registry[
-                f"logevent_{data['id'].removeprefix('evt_')}"
+                f"logevent_{data[attcpip.CommonCommandArgument.ID].removeprefix('evt_')}"
             ]
             jsonschema.validate(data, json_schema)
 
@@ -129,9 +131,9 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
         assert data[attcpip.CommonCommandArgument.SEQUENCE_ID] == sequence_id
 
     async def test_set_instrument_port(self) -> None:
-        async with self.create_mcs_simulator() as simulator, self.create_cmd_evt_client(
-            simulator
-        ) as cmd_evt_client:
+        async with self.create_mcs_simulator(
+            go_to_fault_state=False
+        ) as simulator, self.create_cmd_evt_client(simulator) as cmd_evt_client:
             # First use a valid port number and verify that all responses are
             # as expected, including the SUCCESS response.
             sequence_id = 1
@@ -197,15 +199,15 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_start_tracking(self) -> None:
-        async with self.create_mcs_simulator() as simulator, self.create_cmd_evt_client(
-            simulator
-        ) as cmd_evt_client:
+        async with self.create_mcs_simulator(
+            go_to_fault_state=False
+        ) as simulator, self.create_cmd_evt_client(simulator) as cmd_evt_client:
             await self.verify_start_tracking(client=cmd_evt_client)
 
     async def test_stop_tracking(self) -> None:
-        async with self.create_mcs_simulator() as simulator, self.create_cmd_evt_client(
-            simulator
-        ) as cmd_evt_client:
+        async with self.create_mcs_simulator(
+            go_to_fault_state=False
+        ) as simulator, self.create_cmd_evt_client(simulator) as cmd_evt_client:
             sequence_id = 1
             await cmd_evt_client.write_json(
                 data={
@@ -227,9 +229,9 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
             )
 
     async def test_track_target(self) -> None:
-        async with self.create_mcs_simulator() as simulator, self.create_cmd_evt_client(
-            simulator
-        ) as cmd_evt_client:
+        async with self.create_mcs_simulator(
+            go_to_fault_state=False
+        ) as simulator, self.create_cmd_evt_client(simulator) as cmd_evt_client:
             await self.verify_start_tracking(client=cmd_evt_client)
 
             # sequence_id == 1 was used by the start_tracking command.
@@ -267,9 +269,9 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
             )
 
     async def test_non_existing_command(self) -> None:
-        async with self.create_mcs_simulator() as simulator, self.create_cmd_evt_client(
-            simulator
-        ) as cmd_evt_client:
+        async with self.create_mcs_simulator(
+            go_to_fault_state=False
+        ) as simulator, self.create_cmd_evt_client(simulator) as cmd_evt_client:
             sequence_id = 1
             await cmd_evt_client.write_json(
                 data={
@@ -284,9 +286,9 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
             )
 
     async def test_skip_sequence_id(self) -> None:
-        async with self.create_mcs_simulator() as simulator, self.create_cmd_evt_client(
-            simulator
-        ) as cmd_evt_client:
+        async with self.create_mcs_simulator(
+            go_to_fault_state=False
+        ) as simulator, self.create_cmd_evt_client(simulator) as cmd_evt_client:
             sequence_id = 1
             await cmd_evt_client.write_json(
                 data={
@@ -323,17 +325,21 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
             )
 
     async def test_update_events(self) -> None:
-        async with self.create_mcs_simulator() as simulator, self.create_cmd_evt_client(
-            simulator
-        ) as cmd_evt_client:
+        async with self.create_mcs_simulator(
+            go_to_fault_state=False
+        ) as simulator, self.create_cmd_evt_client(simulator) as cmd_evt_client:
             await simulator.configure()
             await simulator.update_events()
             await self.verify_almost_all_events(client=cmd_evt_client)
 
     async def test_update_telemetry(self) -> None:
-        async with self.create_mcs_simulator() as simulator, self.create_cmd_evt_client(
+        async with self.create_mcs_simulator(
+            go_to_fault_state=False
+        ) as simulator, self.create_cmd_evt_client(
             simulator
-        ), self.create_telemetry_client(simulator) as telemetry_client:
+        ), self.create_telemetry_client(
+            simulator
+        ) as telemetry_client:
             # No need to call ``simulator.update_telemetry`` explicitly since
             # connecting with a cmd_evt_client starts the event and telemetry
             # loop.
@@ -346,17 +352,17 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
                 jsonschema.validate(data, json_schema)
 
     async def test_stimulator_state_commands(self) -> None:
-        async with self.create_mcs_simulator() as simulator, self.create_cmd_evt_client(
-            simulator
-        ) as cmd_evt_client:
-            assert simulator.simulator_state == attcpip.SimulatorState.STANDBY
+        async with self.create_mcs_simulator(
+            go_to_fault_state=False
+        ) as simulator, self.create_cmd_evt_client(simulator) as cmd_evt_client:
+            assert simulator.simulator_state == sal_enums.State.STANDBY
 
             sequence_id = 0
             commands_and_expected_states = {
-                attcpip.CommonCommand.START: attcpip.SimulatorState.DISABLED,
-                attcpip.CommonCommand.ENABLE: attcpip.SimulatorState.ENABLED,
-                attcpip.CommonCommand.DISABLE: attcpip.SimulatorState.DISABLED,
-                attcpip.CommonCommand.STANDBY: attcpip.SimulatorState.STANDBY,
+                attcpip.CommonCommand.START: sal_enums.State.DISABLED,
+                attcpip.CommonCommand.ENABLE: sal_enums.State.ENABLED,
+                attcpip.CommonCommand.DISABLE: sal_enums.State.DISABLED,
+                attcpip.CommonCommand.STANDBY: sal_enums.State.STANDBY,
             }
 
             for command in commands_and_expected_states:
@@ -374,6 +380,47 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
                     client=cmd_evt_client,
                     ack=attcpip.Ack.SUCCESS,
                     sequence_id=sequence_id,
+                )
+                await self.verify_event(
+                    cmd_evt_client, attcpip.CommonEvent.SUMMARY_STATE
+                )
+                assert (
+                    simulator.simulator_state == commands_and_expected_states[command]
+                )
+
+    async def test_fault_state(self) -> None:
+        async with self.create_mcs_simulator(
+            go_to_fault_state=True
+        ) as simulator, self.create_cmd_evt_client(simulator) as cmd_evt_client:
+            assert simulator.simulator_state == sal_enums.State.STANDBY
+            sequence_id = 0
+            commands_and_expected_states = {
+                attcpip.CommonCommand.START: sal_enums.State.FAULT,
+                attcpip.CommonCommand.STANDBY: sal_enums.State.STANDBY,
+            }
+
+            for command in commands_and_expected_states:
+                sequence_id = sequence_id + 1
+                await cmd_evt_client.write_json(
+                    data={
+                        attcpip.CommonCommandArgument.ID: command,
+                        attcpip.CommonCommandArgument.SEQUENCE_ID: sequence_id,
+                    }
+                )
+                await self.verify_command_response(
+                    client=cmd_evt_client, ack=attcpip.Ack.ACK, sequence_id=sequence_id
+                )
+                await self.verify_command_response(
+                    client=cmd_evt_client,
+                    ack=attcpip.Ack.SUCCESS,
+                    sequence_id=sequence_id,
+                )
+                if commands_and_expected_states[command] == sal_enums.State.FAULT:
+                    await self.verify_event(
+                        cmd_evt_client, attcpip.CommonEvent.DETAILED_STATE
+                    )
+                await self.verify_event(
+                    cmd_evt_client, attcpip.CommonEvent.SUMMARY_STATE
                 )
                 assert (
                     simulator.simulator_state == commands_and_expected_states[command]

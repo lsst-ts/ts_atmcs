@@ -27,7 +27,7 @@ import typing
 
 import numpy as np
 from lsst.ts import attcpip, simactuators, tcpip, utils
-from lsst.ts.idl.enums.ATMCS import AtMountState, M3State
+from lsst.ts.xml.enums.ATMCS import AtMountState, DetailedState, M3State
 
 from .dataclasses import (
     AXIS_EVENT_DICT,
@@ -307,6 +307,13 @@ class McsSimulator(attcpip.AtSimulator):
             await self.start_tasks()
         else:
             await self.stop_tasks()
+
+    async def send_detailed_state_events(self) -> None:
+        """Send detailed state events."""
+        await self._write_evt(
+            evt_id=attcpip.CommonEvent.DETAILED_STATE,
+            detailedState=DetailedState.RemoteControlState,
+        )
 
     async def do_set_instrument_port(self, *, sequence_id: int, port: int) -> None:
         """Set the M3 instrument port.
