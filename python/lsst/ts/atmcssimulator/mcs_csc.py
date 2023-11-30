@@ -986,18 +986,18 @@ class ATMCSCsc(salobj.BaseCsc):
                 azel_mountMotorEncoders_data.azimuth2Encoder[i] = motor_pos[
                     Axis.Azimuth
                 ]
-                azel_mountMotorEncoders_data.elevationEncoderRaw[
-                    i
-                ] = motor_encoder_counts[Axis.Elevation]
-                azel_mountMotorEncoders_data.azimuth1EncoderRaw[
-                    i
-                ] = motor_encoder_counts[Axis.Azimuth]
-                azel_mountMotorEncoders_data.azimuth2EncoderRaw[
-                    i
-                ] = motor_encoder_counts[Axis.Azimuth]
+                azel_mountMotorEncoders_data.elevationEncoderRaw[i] = (
+                    motor_encoder_counts[Axis.Elevation]
+                )
+                azel_mountMotorEncoders_data.azimuth1EncoderRaw[i] = (
+                    motor_encoder_counts[Axis.Azimuth]
+                )
+                azel_mountMotorEncoders_data.azimuth2EncoderRaw[i] = (
+                    motor_encoder_counts[Axis.Azimuth]
+                )
 
                 nasmyth_m3_mountMotorEncoders_data = (
-                    self.tel_nasymth_m3_mountMotorEncoders.data
+                    self.tel_nasmyth_m3_mountMotorEncoders.data
                 )
                 nasmyth_m3_mountMotorEncoders_data.nasmyth1Encoder[i] = motor_pos[
                     Axis.NA1
@@ -1006,15 +1006,15 @@ class ATMCSCsc(salobj.BaseCsc):
                     Axis.NA2
                 ]
                 nasmyth_m3_mountMotorEncoders_data.m3Encoder[i] = motor_pos[Axis.M3]
-                nasmyth_m3_mountMotorEncoders_data.nasmyth1EncoderRaw[
-                    i
-                ] = motor_encoder_counts[Axis.NA1]
-                nasmyth_m3_mountMotorEncoders_data.nasmyth2EncoderRaw[
-                    i
-                ] = motor_encoder_counts[Axis.NA2]
-                nasmyth_m3_mountMotorEncoders_data.m3EncoderRaw[
-                    i
-                ] = motor_encoder_counts[Axis.M3]
+                nasmyth_m3_mountMotorEncoders_data.nasmyth1EncoderRaw[i] = (
+                    motor_encoder_counts[Axis.NA1]
+                )
+                nasmyth_m3_mountMotorEncoders_data.nasmyth2EncoderRaw[i] = (
+                    motor_encoder_counts[Axis.NA2]
+                )
+                nasmyth_m3_mountMotorEncoders_data.m3EncoderRaw[i] = (
+                    motor_encoder_counts[Axis.M3]
+                )
 
             await self.tel_trajectory.set_write(cRIO_timestamp=times[0])
             await self.tel_mount_AzEl_Encoders.set_write(cRIO_timestamp=times[0])
@@ -1023,7 +1023,7 @@ class ATMCSCsc(salobj.BaseCsc):
             await self.tel_measuredTorque.set_write(cRIO_timestamp=times[0])
             await self.tel_measuredMotorVelocity.set_write(cRIO_timestamp=times[0])
             await self.tel_azEl_mountMotorEncoders.set_write(cRIO_timestamp=times[0])
-            await self.tel_nasymth_m3_mountMotorEncoders.set_write(
+            await self.tel_nasmyth_m3_mountMotorEncoders.set_write(
                 cRIO_timestamp=times[0]
             )
         except Exception as e:
