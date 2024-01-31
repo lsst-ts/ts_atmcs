@@ -18,7 +18,7 @@ v2.0.0
 * Reorganize constants and event information.
 * Add support for sending start, disable, enable and standby commands.
 * Fix typo in the "ATMCS_nasmyth_m3_mountMotorEncoders" telemetry topic name.
-* Add support for summary state and detailed state events and for FAULT state.
+* Add support for summary state, detailed state and errorCode events and for FAULT state.
 * Support simulation mode 0.
 
 Requires:

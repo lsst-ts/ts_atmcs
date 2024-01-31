@@ -422,6 +422,10 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
                 await self.verify_event(
                     cmd_evt_client, attcpip.CommonEvent.SUMMARY_STATE
                 )
+                if commands_and_expected_states[command] == sal_enums.State.FAULT:
+                    await self.verify_event(
+                        cmd_evt_client, attcpip.CommonEvent.ERROR_CODE
+                    )
                 assert (
                     simulator.simulator_state == commands_and_expected_states[command]
                 )
