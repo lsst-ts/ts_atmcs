@@ -875,30 +875,30 @@ class McsSimulator(attcpip.AtSimulator):
                     Axis.Azimuth
                 ]
 
-                self.mount_nasmyth_encoders.nasmyth1CalculatedAngle[
-                    i
-                ] = current_position[Axis.NA1]
-                self.mount_nasmyth_encoders.nasmyth1Encoder1Raw[
-                    i
-                ] = axis_encoder_counts[Axis.NA1]
-                self.mount_nasmyth_encoders.nasmyth1Encoder2Raw[
-                    i
-                ] = axis_encoder_counts[Axis.NA1]
-                self.mount_nasmyth_encoders.nasmyth1Encoder3Raw[
-                    i
-                ] = axis_encoder_counts[Axis.NA1]
-                self.mount_nasmyth_encoders.nasmyth2CalculatedAngle[
-                    i
-                ] = current_position[Axis.NA2]
-                self.mount_nasmyth_encoders.nasmyth2Encoder1Raw[
-                    i
-                ] = axis_encoder_counts[Axis.NA2]
-                self.mount_nasmyth_encoders.nasmyth2Encoder2Raw[
-                    i
-                ] = axis_encoder_counts[Axis.NA2]
-                self.mount_nasmyth_encoders.nasmyth2Encoder3Raw[
-                    i
-                ] = axis_encoder_counts[Axis.NA2]
+                self.mount_nasmyth_encoders.nasmyth1CalculatedAngle[i] = (
+                    current_position[Axis.NA1]
+                )
+                self.mount_nasmyth_encoders.nasmyth1Encoder1Raw[i] = (
+                    axis_encoder_counts[Axis.NA1]
+                )
+                self.mount_nasmyth_encoders.nasmyth1Encoder2Raw[i] = (
+                    axis_encoder_counts[Axis.NA1]
+                )
+                self.mount_nasmyth_encoders.nasmyth1Encoder3Raw[i] = (
+                    axis_encoder_counts[Axis.NA1]
+                )
+                self.mount_nasmyth_encoders.nasmyth2CalculatedAngle[i] = (
+                    current_position[Axis.NA2]
+                )
+                self.mount_nasmyth_encoders.nasmyth2Encoder1Raw[i] = (
+                    axis_encoder_counts[Axis.NA2]
+                )
+                self.mount_nasmyth_encoders.nasmyth2Encoder2Raw[i] = (
+                    axis_encoder_counts[Axis.NA2]
+                )
+                self.mount_nasmyth_encoders.nasmyth2Encoder3Raw[i] = (
+                    axis_encoder_counts[Axis.NA2]
+                )
 
                 self.torqueDemand.elevationMotorTorque[i] = torque[Axis.Elevation]
                 self.torqueDemand.azimuthMotor1Torque[i] = torque[Axis.Azimuth]
@@ -933,15 +933,15 @@ class McsSimulator(attcpip.AtSimulator):
                 self.azel_mountMotorEncoders.azimuth2Encoder[i] = motor_pos[
                     Axis.Azimuth
                 ]
-                self.azel_mountMotorEncoders.elevationEncoderRaw[
-                    i
-                ] = motor_encoder_counts[Axis.Elevation]
-                self.azel_mountMotorEncoders.azimuth1EncoderRaw[
-                    i
-                ] = motor_encoder_counts[Axis.Azimuth]
-                self.azel_mountMotorEncoders.azimuth2EncoderRaw[
-                    i
-                ] = motor_encoder_counts[Axis.Azimuth]
+                self.azel_mountMotorEncoders.elevationEncoderRaw[i] = (
+                    motor_encoder_counts[Axis.Elevation]
+                )
+                self.azel_mountMotorEncoders.azimuth1EncoderRaw[i] = (
+                    motor_encoder_counts[Axis.Azimuth]
+                )
+                self.azel_mountMotorEncoders.azimuth2EncoderRaw[i] = (
+                    motor_encoder_counts[Axis.Azimuth]
+                )
 
                 self.nasmyth_m3_mountMotorEncoders.nasmyth1Encoder[i] = motor_pos[
                     Axis.NA1
@@ -950,15 +950,15 @@ class McsSimulator(attcpip.AtSimulator):
                     Axis.NA2
                 ]
                 self.nasmyth_m3_mountMotorEncoders.m3Encoder[i] = motor_pos[Axis.M3]
-                self.nasmyth_m3_mountMotorEncoders.nasmyth1EncoderRaw[
-                    i
-                ] = motor_encoder_counts[Axis.NA1]
-                self.nasmyth_m3_mountMotorEncoders.nasmyth2EncoderRaw[
-                    i
-                ] = motor_encoder_counts[Axis.NA2]
-                self.nasmyth_m3_mountMotorEncoders.m3EncoderRaw[
-                    i
-                ] = motor_encoder_counts[Axis.M3]
+                self.nasmyth_m3_mountMotorEncoders.nasmyth1EncoderRaw[i] = (
+                    motor_encoder_counts[Axis.NA1]
+                )
+                self.nasmyth_m3_mountMotorEncoders.nasmyth2EncoderRaw[i] = (
+                    motor_encoder_counts[Axis.NA2]
+                )
+                self.nasmyth_m3_mountMotorEncoders.m3EncoderRaw[i] = (
+                    motor_encoder_counts[Axis.M3]
+                )
 
             await self._write_telemetry(
                 tel_id=Telemetry.TRAJECTORY,
