@@ -20,6 +20,7 @@ v2.0.0
 * Fix typo in the "ATMCS_nasmyth_m3_mountMotorEncoders" telemetry topic name.
 * Add support for summary state, detailed state and errorCode events and for FAULT state.
 * Support simulation mode 0.
+* Update the version of ts-conda-build to 0.4 in the conda recipe.
 
 Requires:
 
