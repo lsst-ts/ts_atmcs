@@ -6,6 +6,11 @@
 Version History
 ###############
 
+v1.5.5
+------
+
+* Fix topic typo.
+
 v1.5.4
 ------
 
