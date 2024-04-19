@@ -29,6 +29,10 @@ STD_TIMEOUT = 10  # standard timeout, seconds
 
 
 class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls._randomize_topic_subname = True
+
     def setUp(self):
         super().setUp()
         self.axis_names = (  # names of axes for trackTarget command
