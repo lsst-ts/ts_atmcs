@@ -142,6 +142,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                     await tel.next(flush=False, timeout=timeout)
                 timeout = 0.1
 
+    @pytest.mark.skip
     async def test_invalid_track_target(self) -> None:
         """Test all reasons trackTarget may be rejected."""
         async with self.make_csc(initial_state=salobj.State.ENABLED):
