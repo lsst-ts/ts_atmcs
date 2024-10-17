@@ -20,6 +20,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import asyncio
+import pathlib
 import unittest
 from typing import Any
 
@@ -50,6 +51,8 @@ SIX_CTRL_EVT = tuple[
     salobj.topics.ControllerEvent,
     salobj.topics.ControllerEvent,
 ]
+
+CONFIG_DIR = pathlib.Path(__file__).parent / "data" / "config"
 
 
 class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
@@ -112,7 +115,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
         except the m3PortSelected event
         """
-        async with self.make_csc(initial_state=salobj.State.ENABLED):
+        async with self.make_csc(
+            initial_state=salobj.State.ENABLED, config_dir=CONFIG_DIR
+        ):
             await self.assert_next_summary_state(salobj.State.ENABLED)
             await self.csc.simulator.configure()
             await self.assert_next_sample(
@@ -145,7 +150,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     @pytest.mark.skip
     async def test_invalid_track_target(self) -> None:
         """Test all reasons trackTarget may be rejected."""
-        async with self.make_csc(initial_state=salobj.State.ENABLED):
+        async with self.make_csc(
+            initial_state=salobj.State.ENABLED, config_dir=CONFIG_DIR
+        ):
             # Get the initial summary state, so `fault_to_enabled` sees FAULT.
             await self.assert_next_summary_state(salobj.State.ENABLED)
 
@@ -297,7 +304,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
 
     async def test_brake_and_drive_status_events(self) -> None:
-        async with self.make_csc(initial_state=salobj.State.STANDBY):
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY, config_dir=CONFIG_DIR
+        ):
             # No events get emitted since no connection has been made yet to
             # the remote ATMCS system.
             with pytest.raises(asyncio.TimeoutError):
@@ -339,7 +348,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 )
 
     async def test_standard_state_transitions(self) -> None:
-        async with self.make_csc(initial_state=salobj.State.STANDBY):
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY, config_dir=CONFIG_DIR
+        ):
             await self.check_standard_state_transitions(
                 enabled_commands=(
                     "startTracking",
@@ -350,7 +361,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
 
     async def test_set_instrument_port(self) -> None:
-        async with self.make_csc(initial_state=salobj.State.ENABLED):
+        async with self.make_csc(
+            initial_state=salobj.State.ENABLED, config_dir=CONFIG_DIR
+        ):
             # Get the initial summary state, so `fault_to_enabled` sees FAULT.
             await self.assert_next_summary_state(salobj.State.ENABLED)
             await self.csc.simulator.configure(
@@ -460,7 +473,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_track(self) -> None:
-        async with self.make_csc(initial_state=salobj.State.ENABLED):
+        async with self.make_csc(
+            initial_state=salobj.State.ENABLED, config_dir=CONFIG_DIR
+        ):
             await self.csc.simulator.configure(
                 max_velocity=np.array(
                     [
@@ -560,7 +575,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     async def test_late_track_target(self) -> None:
         # Use a short tracking interval so the test runs quickly.
         max_tracking_interval = 0.2
-        async with self.make_csc(initial_state=salobj.State.ENABLED):
+        async with self.make_csc(
+            initial_state=salobj.State.ENABLED, config_dir=CONFIG_DIR
+        ):
             # Get the initial summary state, so `fault_to_enabled` sees FAULT.
             await self.assert_next_summary_state(salobj.State.ENABLED)
 
@@ -625,7 +642,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
     async def test_stop_tracking_while_slewing(self) -> None:
         """Call stopTracking while tracking, before a slew is done."""
-        async with self.make_csc(initial_state=salobj.State.ENABLED):
+        async with self.make_csc(
+            initial_state=salobj.State.ENABLED, config_dir=CONFIG_DIR
+        ):
             await self.csc.simulator.configure()
             await self.assert_next_sample(
                 self.remote.evt_atMountState, state=AtMountState.TRACKINGDISABLED
@@ -680,7 +699,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
     async def test_disable_while_slewing(self) -> None:
         """Call disable while tracking, before a slew is done."""
-        async with self.make_csc(initial_state=salobj.State.ENABLED):
+        async with self.make_csc(
+            initial_state=salobj.State.ENABLED, config_dir=CONFIG_DIR
+        ):
             state = await self.remote.evt_summaryState.next(flush=False, timeout=5)
             assert state.summaryState == salobj.State.ENABLED
             await self.csc.simulator.configure()
@@ -774,7 +795,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         return target_kwargs
 
     async def test_csc_state_commands(self) -> None:
-        async with self.make_csc(initial_state=salobj.State.STANDBY):
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY, config_dir=CONFIG_DIR
+        ):
             await self.remote.cmd_start.start()
             await self.csc.simulator.configure()
             assert self.csc.simulator.simulator_state == sal_enums.State.DISABLED
@@ -801,7 +824,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             assert self.csc.simulator.simulator_state == sal_enums.State.STANDBY
 
     async def test_csc_with_fault_state(self) -> None:
-        async with self.make_csc(initial_state=salobj.State.STANDBY):
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY, config_dir=CONFIG_DIR
+        ):
             await self.remote.cmd_start.start()
             await self.csc.simulator.configure()
             assert self.csc.simulator.simulator_state == sal_enums.State.DISABLED

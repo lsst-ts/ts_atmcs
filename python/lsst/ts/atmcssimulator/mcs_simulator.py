@@ -141,7 +141,7 @@ class McsSimulator(attcpip.AtSimulator):
         self._events_per_telemetry = 10
 
         # Configuration items.
-        self.max_tracking_interval = np.zeros(5)
+        self.max_tracking_interval = 0.0
         self.min_commanded_position = np.zeros(5)
         self.max_commanded_position = np.zeros(5)
         self.min_limit_switch_position = np.zeros(5)
