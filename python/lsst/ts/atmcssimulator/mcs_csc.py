@@ -74,6 +74,7 @@ class ATMCSCsc(attcpip.AtTcpipCsc):
                 cmd_evt_port=self.config.cmd_evt_port,
                 telemetry_port=self.config.telemetry_port,
             )
+            await self.simulator.configure()
         await super().start_clients()
 
     async def do_startTracking(self, data: salobj.BaseMsgType) -> None:
