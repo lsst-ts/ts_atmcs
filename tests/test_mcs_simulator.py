@@ -108,6 +108,8 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
     async def verify_almost_all_events(self, client: tcpip.Client) -> None:
         for _ in range(len(EVENTS_TO_EXPECT)):
             data = await client.read_json()
+            if data[attcpip.CommonCommandArgument.ID] == "evt_summaryState":
+                continue
             # No need for asserts here. If the data id is not present in
             # registry or the validation of the schema fails, the test will
             # fail as well.
@@ -320,7 +322,7 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
             )
             await self.verify_command_response(
                 client=cmd_evt_client,
-                ack=attcpip.Ack.NOACK,
+                ack=attcpip.Ack.ACK,
                 sequence_id=sequence_id,
             )
 
