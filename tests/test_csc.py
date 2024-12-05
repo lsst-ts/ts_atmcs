@@ -110,7 +110,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             override=override,
         )
 
-    @pytest.mark.skip
     async def test_initial_info(self) -> None:
         """Check that all events and telemetry are output at startup
 
@@ -135,6 +134,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                     "softwareVersions",  # already read
                     "logMessage",  # not reliably output
                     "detailedState",  # not output by the simulator
+                    "configurationsAvailable",  # not output by the simulator
                 ):
                     continue
                 with self.subTest(event_name=event_name):
@@ -403,7 +403,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 self.remote.evt_nasmyth1DriveStatus, enable=False
             )
             data = self.remote.evt_nasmyth2DriveStatus.get()
-            assert not (data.enable)
+            assert not data.enable
 
             start_tai = utils.current_tai()
 
