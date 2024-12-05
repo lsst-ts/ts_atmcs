@@ -84,8 +84,7 @@ class ATMCSCsc(attcpip.AtTcpipCsc):
 
     async def do_trackTarget(self, data: salobj.BaseMsgType) -> None:
         self.assert_enabled("trackTarget")
-        # command_issued = await self.write_command(
-        await self.write_command(
+        command_issued = await self.write_command(
             command=Command.TRACK_TARGET,
             azimuth=data.azimuth,
             azimuthVelocity=data.azimuthVelocity,
@@ -100,7 +99,8 @@ class ATMCSCsc(attcpip.AtTcpipCsc):
             tracksys=data.tracksys,
             radesys=data.radesys,
         )
-        # await command_issued.done
+        if self.simulation_mode == 1 and self.simulator is None:
+            await command_issued.done
 
     async def do_setInstrumentPort(self, data: salobj.BaseMsgType) -> None:
         self.assert_enabled("setInstrumentPort")
