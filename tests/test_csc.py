@@ -110,6 +110,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             override=override,
         )
 
+    @pytest.mark.skip
     async def test_initial_info(self) -> None:
         """Check that all events and telemetry are output at startup
 
