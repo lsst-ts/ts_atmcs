@@ -99,7 +99,8 @@ class ATMCSCsc(attcpip.AtTcpipCsc):
             tracksys=data.tracksys,
             radesys=data.radesys,
         )
-        if self.simulation_mode == 1 and self.simulator is None:
+        self.log.debug("WOUTER")
+        if self.simulation_mode == 1:
             await command_issued.done
 
     async def do_setInstrumentPort(self, data: salobj.BaseMsgType) -> None:
