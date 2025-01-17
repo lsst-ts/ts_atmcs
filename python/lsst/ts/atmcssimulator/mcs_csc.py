@@ -80,7 +80,7 @@ class ATMCSCsc(attcpip.AtTcpipCsc):
     async def do_startTracking(self, data: salobj.BaseMsgType) -> None:
         self.assert_enabled("startTracking")
         command_issued = await self.write_command(command=Command.START_TRACKING)
-        await self.cmd_disable.ack_in_progress(data, self.cmd_done_timeout)
+        await self.cmd_startTracking.ack_in_progress(data, self.cmd_done_timeout)
         await command_issued.done
 
     async def do_trackTarget(self, data: salobj.BaseMsgType) -> None:
@@ -100,7 +100,7 @@ class ATMCSCsc(attcpip.AtTcpipCsc):
             tracksys=data.tracksys,
             radesys=data.radesys,
         )
-        await self.cmd_disable.ack_in_progress(data, self.cmd_done_timeout)
+        await self.cmd_trackTarget.ack_in_progress(data, self.cmd_done_timeout)
         if self.simulation_mode == 1:
             await command_issued.done
 
@@ -110,13 +110,13 @@ class ATMCSCsc(attcpip.AtTcpipCsc):
         command_issued = await self.write_command(
             command=Command.SET_INSTRUMENT_PORT, port=port
         )
-        await self.cmd_disable.ack_in_progress(data, self.cmd_done_timeout)
+        await self.cmd_setInstrumentPort.ack_in_progress(data, self.cmd_done_timeout)
         await command_issued.done
 
     async def do_stopTracking(self, data: salobj.BaseMsgType) -> None:
         self.assert_enabled("stopTracking")
         command_issued = await self.write_command(command=Command.STOP_TRACKING)
-        await self.cmd_disable.ack_in_progress(data, self.cmd_done_timeout)
+        await self.cmd_stopTracking.ack_in_progress(data, self.cmd_done_timeout)
         await command_issued.done
 
 
