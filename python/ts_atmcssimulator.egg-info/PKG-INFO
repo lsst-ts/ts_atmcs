@@ -1,0 +1,12 @@
+Metadata-Version: 2.4
+Name: ts_atmcssimulator
+Version: 2.0.0rc4.dev0+g947048c.d20250329
+Summary: An LSST Telescope and Site package that provides a simulator for the auxiliary telescope motor control system (ATMCS).
+License: GPL
+Project-URL: documentation, https://ts-atmcssimulator.lsst.io
+Project-URL: repository, https://github.com/lsst-ts/ts_atmcssimulator
+Classifier: Programming Language :: Python :: 3
+License-File: LICENSE
+Provides-Extra: dev
+Requires-Dist: documenteer[pipelines]; extra == "dev"
+Dynamic: license-file

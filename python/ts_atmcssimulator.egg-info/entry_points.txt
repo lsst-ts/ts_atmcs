@@ -1,0 +1,2 @@
+[console_scripts]
+run_atmcs_simulator = lsst.ts.atmcssimulator:run_atmcs_simulator

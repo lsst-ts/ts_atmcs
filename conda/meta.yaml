@@ -7,24 +7,15 @@ source:
   path: ../
 
 build:
-  noarch: generic
+  noarch: python
   script: {{ PYTHON }} -m pip install --no-deps --ignore-installed .
   entry_points:
     - run_atmcs_simulator = lsst.ts.atmcssimulator:run_atmcs_simulator
-  script_env:
-    - PATH
-    - PYTHONPATH
-    - LD_LIBRARY_PATH
-    - OSPL_HOME
-    - PYTHON_BUILD_VERSION
-    - PYTHON_BUILD_LOCATION
-    - LSST_DDS_DOMAIN
 
 test:
   requires:
     - ts-conda-build =0.4
-    - ts-dds
-    - ts-idl {{ idl_version }}
+    - ts-xml {{ xml_version }}
     - ts-salobj {{ salobj_version }}
     - ts-attcpip
     - ts-simactuators
@@ -50,7 +41,7 @@ requirements:
     - setuptools_scm
   run:
     - python {{ python }}
-    - ts-idl
+    - ts-xml
     - ts-salobj
     - ts-attcpip
     - ts-simactuators

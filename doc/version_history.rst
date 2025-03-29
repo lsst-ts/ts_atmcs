@@ -21,6 +21,7 @@ v2.0.0
 * Add support for summary state, detailed state and errorCode events and for FAULT state.
 * Support simulation mode 0.
 * Update the version of ts-conda-build to 0.4 in the conda recipe.
+* Update conda recipe to use ts-xml.
 
 Requires:
 
