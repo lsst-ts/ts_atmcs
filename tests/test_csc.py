@@ -832,5 +832,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await self.remote.cmd_start.set_start()
             assert self.csc.simulator.simulator_state == sal_enums.State.FAULT
 
+            await self.csc.simulator.standby(sequence_id=-1)
+            await asyncio.sleep(0.2)
+
             await self.remote.cmd_standby.set_start()
             assert self.csc.simulator.simulator_state == sal_enums.State.STANDBY
