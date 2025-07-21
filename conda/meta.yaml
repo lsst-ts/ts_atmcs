@@ -1,6 +1,6 @@
 {% set data= load_setup_py_data() %}
 package:
-  name: ts-atmcs-simulator
+  name: ts-atmcs
   version: {{ data.get('version') }}
 
 source:
@@ -10,7 +10,7 @@ build:
   noarch: python
   script: {{ PYTHON }} -m pip install --no-deps --ignore-installed .
   entry_points:
-    - run_atmcs_simulator = lsst.ts.atmcssimulator:run_atmcs_simulator
+    - run_atmcs = lsst.ts.atmcs:run_atmcs
 
 test:
   requires:

@@ -1,4 +1,4 @@
-# This file is part of ts_atmcssimulator.
+# This file is part of ts_atmcs.
 #
 # # Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
 # This product includes software developed by the LSST Project
@@ -27,7 +27,7 @@ This configuration only affects single-package Sphinx documentation builds.
 import lsst.ts.salobj  # noqa
 from documenteer.conf.pipelinespkg import *  # type: ignore # noqa
 
-project = "ts_atmcssimulator"
+project = "ts_atmcs"
 html_theme_options["logotext"] = project  # type: ignore # noqa
 html_title = project
 html_short_title = project

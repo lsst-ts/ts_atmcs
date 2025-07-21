@@ -1,4 +1,4 @@
-# This file is part of ts_atmcssimulator.
+# This file is part of ts_atmcs.
 #
 # # Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
 # This product includes software developed by the LSST Project
@@ -26,7 +26,7 @@ from typing import Any
 
 import numpy as np
 import pytest
-from lsst.ts import atmcssimulator, salobj, simactuators, utils
+from lsst.ts import atmcs, salobj, simactuators, utils
 from lsst.ts.xml import sal_enums
 from lsst.ts.xml.enums.ATMCS import AtMountState, M3ExitPort, M3State
 
@@ -102,8 +102,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         config_dir: str,
         override: str = "",
         **kwargs: Any,
-    ) -> atmcssimulator.ATMCSCsc:
-        return atmcssimulator.ATMCSCsc(
+    ) -> atmcs.ATMCSCsc:
+        return atmcs.ATMCSCsc(
             initial_state=initial_state,
             config_dir=config_dir,
             simulation_mode=1,
@@ -122,7 +122,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await self.csc.simulator.configure()
             await self.assert_next_sample(
                 topic=self.remote.evt_softwareVersions,
-                cscVersion=atmcssimulator.__version__ + "-sim",
+                cscVersion=atmcs.__version__,
                 subsystemVersions="",
             )
 
@@ -222,8 +222,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 self.remote.evt_atMountState, state=AtMountState.TRACKINGDISABLED
             )
 
-            for axis in atmcssimulator.Axis:
-                if axis is atmcssimulator.Axis.M3:
+            for axis in atmcs.Axis:
+                if axis is atmcs.Axis.M3:
                     continue  # trackTarget doesn't accept M3
 
                 with self.subTest(axis=axis):
@@ -413,7 +413,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             with salobj.assertRaisesAckError():
                 await self.remote.cmd_startTracking.start()
 
-            actuator = self.csc.simulator.actuators[atmcssimulator.Axis.M3]
+            actuator = self.csc.simulator.actuators[atmcs.Axis.M3]
             curr_segment = actuator.path.at(utils.current_tai())
             assert curr_segment.velocity != 0
 
@@ -462,9 +462,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             assert not data.enable
 
     async def test_bin_script(self) -> None:
-        await self.check_bin_script(
-            name="ATMCS", index=None, exe_name="run_atmcs_simulator"
-        )
+        await self.check_bin_script(name="ATMCS", index=None, exe_name="run_atmcs")
 
     async def test_track(self) -> None:
         async with self.make_csc(
