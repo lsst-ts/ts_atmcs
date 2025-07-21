@@ -1,6 +1,4 @@
-#!/usr/bin/env python
-
-# This file is part of ts_atmcssimulator.
+# This file is part of ts_atmcs.
 #
 # # Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
 # This product includes software developed by the LSST Project
@@ -21,16 +19,32 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import logging
+__all__ = ["CONFIG_SCHEMA"]
 
-from lsst.ts.atmcssimulator import run_atmcs_simulator
+import yaml
 
-logging.basicConfig(
-    format="%(asctime)s:%(levelname)s:%(name)s:%(message)s", level=logging.DEBUG
+CONFIG_SCHEMA = yaml.safe_load(
+    """
+    $schema: http://json-schema.org/draft-07/schema#
+    $id: https://github.com/lsst-ts/ts_atmcs/blob/main/python/lsst/ts/atmcs/config_schema.py
+    title: ATMCS v1
+    description: Schema for ATMCS CSC configuration files.
+    type: object
+    properties:
+      host:
+        description: IP address of the TCP/IP interface.
+        type: string
+        format: hostname
+      cmd_evt_port:
+        description: Port number of the command and event TCP/IP interface.
+        type: integer
+      telemetry_port:
+        description: Port number of the telemetry TCP/IP interface.
+        type: integer
+    required:
+      - host
+      - cmd_evt_port
+      - telemetry_port
+    additionalProperties: false
+    """
 )
-logging.getLogger("urllib3.connectionpool").setLevel(logging.WARNING)
-logging.getLogger("httpx").setLevel(logging.WARNING)
-logging.getLogger("httpcore.http11").setLevel(logging.INFO)
-logging.getLogger("httpcore.connection").setLevel(logging.INFO)
-
-run_atmcs_simulator()
