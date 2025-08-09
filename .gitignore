@@ -3,7 +3,6 @@
 *.cfgc
 *.pyc
 *.log
-*.egg-info/
 
 # Built by sconsUtils
 version.py
@@ -17,7 +16,6 @@ pytest_session.txt
 .coverage
 
 .vscode
-
 .pre-commit-config.yaml
 .flake8
 .isort.cfg

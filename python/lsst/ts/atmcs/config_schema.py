@@ -19,20 +19,32 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-"""Sphinx configuration file for an LSST stack package.
+__all__ = ["CONFIG_SCHEMA"]
 
-This configuration only affects single-package Sphinx documentation builds.
-"""
+import yaml
 
-import lsst.ts.atmcssimulator  # noqa
-from documenteer.conf.pipelinespkg import *  # type: ignore # noqa
-
-project = "ts_atmcs"
-html_theme_options["logotext"] = project  # type: ignore # noqa
-html_title = project
-html_short_title = project
-
-intersphinx_mapping["ts_salobj"] = ("https://ts-salobj.lsst.io", None)  # type: ignore # noqa
-intersphinx_mapping["ts_simactuators"] = ("https://ts-simactuators.lsst.io", None)  # type: ignore # noqa
-intersphinx_mapping["ts_utils"] = ("https://ts-utils.lsst.io", None)  # type: ignore # noqa
-intersphinx_mapping["ts_xml"] = ("https://ts-xml.lsst.io", None)  # type: ignore # noqa
+CONFIG_SCHEMA = yaml.safe_load(
+    """
+    $schema: http://json-schema.org/draft-07/schema#
+    $id: https://github.com/lsst-ts/ts_atmcs/blob/main/python/lsst/ts/atmcs/config_schema.py
+    title: ATMCS v1
+    description: Schema for ATMCS CSC configuration files.
+    type: object
+    properties:
+      host:
+        description: IP address of the TCP/IP interface.
+        type: string
+        format: hostname
+      cmd_evt_port:
+        description: Port number of the command and event TCP/IP interface.
+        type: integer
+      telemetry_port:
+        description: Port number of the telemetry TCP/IP interface.
+        type: integer
+    required:
+      - host
+      - cmd_evt_port
+      - telemetry_port
+    additionalProperties: false
+    """
+)

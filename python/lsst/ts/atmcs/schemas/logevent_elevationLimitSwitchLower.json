@@ -1,0 +1,18 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+        "id": {
+            "const": "evt_elevationLimitSwitchLower"
+        },
+        "active": {
+            "type": "boolean",
+            "description": "True if telescope elevation axis is at the lower (horizon) L2 limit"
+        }
+    },
+    "required": [
+        "id",
+        "active"
+    ],
+    "additionalProperties": false
+}

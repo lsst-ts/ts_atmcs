@@ -1,0 +1,28 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+        "id": {
+            "const": "evt_m3RotatorDetentSwitches"
+        },
+        "nasmyth1Active": {
+            "type": "boolean",
+            "description": "True if M3 is directing light to Nasmyth 1"
+        },
+        "port3Active": {
+            "type": "boolean",
+            "description": "True if M3 is directing light to the auxiliary port with no rotator."
+        },
+        "nasmyth2Active": {
+            "type": "boolean",
+            "description": "True if M3 is directing light to Nasmyth 2"
+        }
+    },
+    "required": [
+        "id",
+        "nasmyth1Active",
+        "port3Active",
+        "nasmyth2Active"
+    ],
+    "additionalProperties": false
+}

@@ -1,24 +1,25 @@
 {% set data= load_setup_py_data() %}
 package:
-  name: ts-atmcs-simulator
+  name: ts-atmcs
   version: {{ data.get('version') }}
 
 source:
   path: ../
 
 build:
-  noarch: generic
+  noarch: python
   script: {{ PYTHON }} -m pip install --no-deps --ignore-installed .
   entry_points:
-    - run_atmcs_simulator = lsst.ts.atmcssimulator:run_atmcs_simulator
+    - run_atmcs = lsst.ts.atmcs:run_atmcs
 
 test:
   requires:
-    - ts-conda-build =0.3
-    - ts-dds
-    - ts-idl {{ idl_version }}
+    - ts-conda-build =0.4
+    - ts-xml {{ xml_version }}
     - ts-salobj {{ salobj_version }}
+    - ts-attcpip
     - ts-simactuators
+    - ts-tcpip >=1.1.1
     - ts-utils
   source_files:
     - bin
@@ -38,10 +39,11 @@ requirements:
     - python {{ python }}
     - setuptools
     - setuptools_scm
-    - ts-conda-build =0.3
   run:
     - python {{ python }}
-    - ts-idl
+    - ts-xml
     - ts-salobj
+    - ts-attcpip
     - ts-simactuators
+    - ts-tcpip >=1.1.1
     - ts-utils

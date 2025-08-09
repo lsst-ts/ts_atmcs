@@ -1,0 +1,119 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+        "id": {
+            "const": "tel_mount_Nasmyth_Encoders"
+        },
+        "cRIO_timestamp": {
+            "type": "number",
+            "description": "Time for the first sample of each telemetry item in this topic, as measured by the cRIO clock, as unix time."
+        },
+        "nasmyth1CalculatedAngle": {
+            "type": "array",
+            "minItems": 100,
+            "maxItems": 100,
+            "description": "Nasmyth 1 axis position computed from the axis encoders, or nan if this axis is not in use. The range is the software limits (L1), approximately -175 to 175. Increasing the range requires installation of an additional switch. ",
+            "items": [
+                {
+                    "type": "number"
+                }
+            ]
+        },
+        "nasmyth2CalculatedAngle": {
+            "type": "array",
+            "minItems": 100,
+            "maxItems": 100,
+            "description": "Nasmyth 2 axis position computed from the axis encoders, or nan if this axis is not in use. The range is the hard stop limits (L3), approximately -175 to 175. Increasing the range requires installation of an additional switch.",
+            "items": [
+                {
+                    "type": "number"
+                }
+            ]
+        },
+        "nasmyth1Encoder1Raw": {
+            "type": "array",
+            "minItems": 100,
+            "maxItems": 100,
+            "description": "Position (in encoder counts) reported by Nasmyth 1 rotator axis encoder 1.",
+            "items": [
+                {
+                    "type": "number"
+                }
+            ]
+        },
+        "nasmyth1Encoder2Raw": {
+            "type": "array",
+            "minItems": 100,
+            "maxItems": 100,
+            "description": "Position (in encoder counts) reported by Nasmyth 1 rotator axis encoder 2.",
+            "items": [
+                {
+                    "type": "number"
+                }
+            ]
+        },
+        "nasmyth1Encoder3Raw": {
+            "type": "array",
+            "minItems": 100,
+            "maxItems": 100,
+            "description": "Position (in encoder counts) reported by Nasmyth 1 rotator axis encoder 3.",
+            "items": [
+                {
+                    "type": "number"
+                }
+            ]
+        },
+        "nasmyth2Encoder1Raw": {
+            "type": "array",
+            "minItems": 100,
+            "maxItems": 100,
+            "description": "Position (in encoder counts) reported by Nasmyth 2 rotator axis encoder 1.",
+            "items": [
+                {
+                    "type": "number"
+                }
+            ]
+        },
+        "nasmyth2Encoder2Raw": {
+            "type": "array",
+            "minItems": 100,
+            "maxItems": 100,
+            "description": "Position (in encoder counts) reported by Nasmyth 2 rotator axis encoder 2.",
+            "items": [
+                {
+                    "type": "number"
+                }
+            ]
+        },
+        "nasmyth2Encoder3Raw": {
+            "type": "array",
+            "minItems": 100,
+            "maxItems": 100,
+            "description": "Position (in encoder counts) reported by Nasmyth 2 rotator axis encoder 3.",
+            "items": [
+                {
+                    "type": "number"
+                }
+            ]
+        },
+        "trackId": {
+            "type": "number",
+            "description": "Unique identifier given by the ATPoining Component"
+        }
+    },
+    "required": [
+        "id",
+        "cRIO_timestamp",
+        "nasmyth1CalculatedAngle",
+        "nasmyth2CalculatedAngle",
+        "nasmyth1Encoder1Raw",
+        "nasmyth1Encoder2Raw",
+        "nasmyth1Encoder3Raw",
+        "nasmyth2Encoder1Raw",
+        "nasmyth2Encoder2Raw",
+        "nasmyth2Encoder3Raw",
+        "trackId"
+    ],
+    "additionalProperties": false
+}

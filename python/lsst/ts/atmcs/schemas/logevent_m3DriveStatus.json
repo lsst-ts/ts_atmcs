@@ -1,0 +1,18 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+        "id": {
+            "const": "evt_m3DriveStatus"
+        },
+        "enable": {
+            "type": "boolean",
+            "description": "True if the M3 rotator drive is enabled"
+        }
+    },
+    "required": [
+        "id",
+        "enable"
+    ],
+    "additionalProperties": false
+}

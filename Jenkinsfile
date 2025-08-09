@@ -1,2 +1,7 @@
 @Library('JenkinsShared')_
-DevelopPipeline(name: "ts_atmcssimulator", module_name: "lsst.ts.atmcssimulator", idl_names: ["ATMCS"], has_doc_site: false)
+DevelopPipeline(
+    name: "ts_atmcs",
+    module_name: "lsst.ts.atmcs",
+    extra_packages: ["lsst-ts/ts_attcpip"],
+    idl_names: ["ATMCS"]
+)

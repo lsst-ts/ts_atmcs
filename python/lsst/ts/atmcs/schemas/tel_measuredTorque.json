@@ -1,0 +1,90 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+        "id": {
+            "const": "tel_measuredTorque"
+        },
+        "cRIO_timestamp": {
+            "type": "number",
+            "description": "Time for the first sample of each telemetry item in this topic, as measured by the cRIO clock, as unix time."
+        },
+        "elevationMotorTorque": {
+            "type": "array",
+            "minItems": 100,
+            "maxItems": 100,
+            "description": "Elevation drive measured motor torque at 100 Hz beginning at the specified time.",
+            "items": [
+                {
+                    "type": "number"
+                }
+            ]
+        },
+        "azimuthMotor1Torque": {
+            "type": "array",
+            "minItems": 100,
+            "maxItems": 100,
+            "description": "Azimuth drive 1 measured motor torque at 100 Hz beginning at the specified time.",
+            "items": [
+                {
+                    "type": "number"
+                }
+            ]
+        },
+        "azimuthMotor2Torque": {
+            "type": "array",
+            "minItems": 100,
+            "maxItems": 100,
+            "description": "Azimuth drive 2 measured motor torque at 100 Hz beginning at the specified time.",
+            "items": [
+                {
+                    "type": "number"
+                }
+            ]
+        },
+        "nasmyth1MotorTorque": {
+            "type": "array",
+            "minItems": 100,
+            "maxItems": 100,
+            "description": "Nasmyth 1 rotator drive measured motor torque at 100 Hz beginning at the specified time.",
+            "items": [
+                {
+                    "type": "number"
+                }
+            ]
+        },
+        "nasmyth2MotorTorque": {
+            "type": "array",
+            "minItems": 100,
+            "maxItems": 100,
+            "description": "Nasmyth 2 rotator drive measured motor torque at 100 Hz beginning at the specified time.",
+            "items": [
+                {
+                    "type": "number"
+                }
+            ]
+        },
+        "m3Torque": {
+            "type": "array",
+            "minItems": 100,
+            "maxItems": 100,
+            "description": "M3 rotator drive measured motor torque at 100 Hz beginning at the specified time.",
+            "items": [
+                {
+                    "type": "number"
+                }
+            ]
+        }
+    },
+    "required": [
+        "id",
+        "cRIO_timestamp",
+        "elevationMotorTorque",
+        "azimuthMotor1Torque",
+        "azimuthMotor2Torque",
+        "nasmyth1MotorTorque",
+        "nasmyth2MotorTorque",
+        "m3Torque"
+    ],
+    "additionalProperties": false
+}

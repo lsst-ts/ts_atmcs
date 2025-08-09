@@ -1,0 +1,90 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+        "id": {
+            "const": "tel_nasmyth_m3_mountMotorEncoders"
+        },
+        "cRIO_timestamp": {
+            "type": "number",
+            "description": "Time for the first sample of each telemetry item in this topic, as measured by the cRIO clock, as unix time."
+        },
+        "nasmyth1Encoder": {
+            "type": "array",
+            "minItems": 100,
+            "maxItems": 100,
+            "description": "Position reported by Nasmyth rotator 1 drive motor encoder at 100 Hz beginning at the specified time, converted to deg.",
+            "items": [
+                {
+                    "type": "number"
+                }
+            ]
+        },
+        "nasmyth2Encoder": {
+            "type": "array",
+            "minItems": 100,
+            "maxItems": 100,
+            "description": "Position reported by Nasmyth rotator 2 drive motor encoder at 100 Hz beginning at the specified time, converted to deg.",
+            "items": [
+                {
+                    "type": "number"
+                }
+            ]
+        },
+        "m3Encoder": {
+            "type": "array",
+            "minItems": 100,
+            "maxItems": 100,
+            "description": "Position reported by M3 rotator drive motor encoder at 100 Hz beginning at the specified time, converted to deg.",
+            "items": [
+                {
+                    "type": "number"
+                }
+            ]
+        },
+        "nasmyth1EncoderRaw": {
+            "type": "array",
+            "minItems": 100,
+            "maxItems": 100,
+            "description": "Position (in encoder counts) reported by Nasmyth rotator 1 drive motor encoder at 100 Hz beginning at the specified time.",
+            "items": [
+                {
+                    "type": "number"
+                }
+            ]
+        },
+        "nasmyth2EncoderRaw": {
+            "type": "array",
+            "minItems": 100,
+            "maxItems": 100,
+            "description": "Position (in encoder counts) reported by Nasmyth rotator 2 drive motor encoder at 100 Hz beginning at the specified time.",
+            "items": [
+                {
+                    "type": "number"
+                }
+            ]
+        },
+        "m3EncoderRaw": {
+            "type": "array",
+            "minItems": 100,
+            "maxItems": 100,
+            "description": "Position (in encoder counts) reported by M3 rotator drive motor encoder at 100 Hz beginning at the specified time.",
+            "items": [
+                {
+                    "type": "number"
+                }
+            ]
+        }
+    },
+    "required": [
+        "id",
+        "cRIO_timestamp",
+        "nasmyth1Encoder",
+        "nasmyth2Encoder",
+        "m3Encoder",
+        "nasmyth1EncoderRaw",
+        "nasmyth2EncoderRaw",
+        "m3EncoderRaw"
+    ],
+    "additionalProperties": false
+}

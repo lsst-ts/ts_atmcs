@@ -1,0 +1,18 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+        "id": {
+            "const": "evt_azimuthLimitSwitchCCW"
+        },
+        "active": {
+            "type": "boolean",
+            "description": "True if telescope azimuth axis is at the CCW L2 limit"
+        }
+    },
+    "required": [
+        "id",
+        "active"
+    ],
+    "additionalProperties": false
+}

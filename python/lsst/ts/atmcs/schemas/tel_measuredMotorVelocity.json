@@ -1,0 +1,90 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+        "id": {
+            "const": "tel_measuredMotorVelocity"
+        },
+        "cRIO_timestamp": {
+            "type": "number",
+            "description": "Time for the first sample of each telemetry item in this topic, as measured by the cRIO clock, as unix time."
+        },
+        "elevationMotorVelocity": {
+            "type": "array",
+            "minItems": 100,
+            "maxItems": 100,
+            "description": "Measured velocity of elevation drive motor at 100 Hz beginning at the specified time.",
+            "items": [
+                {
+                    "type": "number"
+                }
+            ]
+        },
+        "azimuthMotor1Velocity": {
+            "type": "array",
+            "minItems": 100,
+            "maxItems": 100,
+            "description": "Measured velocity of azimuth drive 1 motor at 100 Hz beginning at the specified time.",
+            "items": [
+                {
+                    "type": "number"
+                }
+            ]
+        },
+        "azimuthMotor2Velocity": {
+            "type": "array",
+            "minItems": 100,
+            "maxItems": 100,
+            "description": "Measured velocity of azimuth drive 2 motor at 100 Hz beginning at the specified time.",
+            "items": [
+                {
+                    "type": "number"
+                }
+            ]
+        },
+        "nasmyth1MotorVelocity": {
+            "type": "array",
+            "minItems": 100,
+            "maxItems": 100,
+            "description": "Measured velocity of Nasmyth 1 drive motor at 100 Hz beginning at the specified time.",
+            "items": [
+                {
+                    "type": "number"
+                }
+            ]
+        },
+        "nasmyth2MotorVelocity": {
+            "type": "array",
+            "minItems": 100,
+            "maxItems": 100,
+            "description": "Measured velocity of Nasmyth 2 drive motor at 100 Hz beginning at the specified time.",
+            "items": [
+                {
+                    "type": "number"
+                }
+            ]
+        },
+        "m3Velocity": {
+            "type": "array",
+            "minItems": 100,
+            "maxItems": 100,
+            "description": "Measured velocity of M3 rotator drive motor at 100 Hz beginning at the specified time.",
+            "items": [
+                {
+                    "type": "number"
+                }
+            ]
+        }
+    },
+    "required": [
+        "id",
+        "cRIO_timestamp",
+        "elevationMotorVelocity",
+        "azimuthMotor1Velocity",
+        "azimuthMotor2Velocity",
+        "nasmyth1MotorVelocity",
+        "nasmyth2MotorVelocity",
+        "m3Velocity"
+    ],
+    "additionalProperties": false
+}

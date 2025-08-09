@@ -1,0 +1,73 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+        "id": {
+            "const": "evt_target"
+        },
+        "elevation": {
+            "type": "number",
+            "description": "Target mount elevation angle at the specified time."
+        },
+        "elevationVelocity": {
+            "type": "number",
+            "description": "Target mount elevation angle velocity at the specified time."
+        },
+        "azimuth": {
+            "type": "number",
+            "description": "Target mount azimuth angle at the specified time. The allowed range is 0 to 360."
+        },
+        "azimuthVelocity": {
+            "type": "number",
+            "description": "Target mount azimuth velocity at the specified time."
+        },
+        "nasmyth1RotatorAngle": {
+            "type": "number",
+            "description": "Target Nasmyth 1 rotator angle at the specified time."
+        },
+        "nasmyth1RotatorAngleVelocity": {
+            "type": "number",
+            "description": "Target Nasmyth 1 rotator angle velocity at the specified time."
+        },
+        "nasmyth2RotatorAngle": {
+            "type": "number",
+            "description": "Target Nasmyth 1 rotator angle at the specified time."
+        },
+        "nasmyth2RotatorAngleVelocity": {
+            "type": "number",
+            "description": "Target Nasmyth 1 rotator angle velocity at the specified time."
+        },
+        "taiTime": {
+            "type": "number",
+            "description": "TAI date at which the commanded positions and velocities apply, as unix time."
+        },
+        "trackId": {
+            "type": "number",
+            "description": "Unique target identifier "
+        },
+        "tracksys": {
+            "type": "string",
+            "description": "Defines tracking coordinate system as sidereal, non-sidereal or local."
+        },
+        "radesys": {
+            "type": "string",
+            "description": "Coordinate reference frame of RA/DEC axes. This originates from the pointing component and is used for WCS definition (e.g. FK5 or ICRS)."
+        }
+    },
+    "required": [
+        "id",
+        "elevation",
+        "elevationVelocity",
+        "azimuth",
+        "azimuthVelocity",
+        "nasmyth1RotatorAngle",
+        "nasmyth1RotatorAngleVelocity",
+        "nasmyth2RotatorAngle",
+        "nasmyth2RotatorAngleVelocity",
+        "taiTime",
+        "trackId",
+        "tracksys",
+        "radesys"
+    ],
+    "additionalProperties": false
+}

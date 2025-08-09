@@ -1,0 +1,114 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+        "id": {
+            "const": "tel_trajectory"
+        },
+        "cRIO_timestamp": {
+            "type": "number",
+            "description": "Time for the first sample of each telemetry item in this topic, as measured by the cRIO clock, as unix time."
+        },
+        "elevation": {
+            "type": "array",
+            "minItems": 100,
+            "maxItems": 100,
+            "description": "Target mount elevation angle at 100Hz beginning at the specified time.",
+            "items": [
+                {
+                    "type": "number"
+                }
+            ]
+        },
+        "elevationVelocity": {
+            "type": "array",
+            "minItems": 100,
+            "maxItems": 100,
+            "description": "Target mount elevation angle velocity at 100Hz beginning at the specified time.",
+            "items": [
+                {
+                    "type": "number"
+                }
+            ]
+        },
+        "azimuth": {
+            "type": "array",
+            "minItems": 100,
+            "maxItems": 100,
+            "description": "Target mount azimuth angle at 100Hz beginning at the specified time. The allowed range is 0 to 360.",
+            "items": [
+                {
+                    "type": "number"
+                }
+            ]
+        },
+        "azimuthVelocity": {
+            "type": "array",
+            "minItems": 100,
+            "maxItems": 100,
+            "description": "Target mount azimuth velocity at 100Hz beginning at the specified time.",
+            "items": [
+                {
+                    "type": "number"
+                }
+            ]
+        },
+        "nasmyth1RotatorAngle": {
+            "type": "array",
+            "minItems": 100,
+            "maxItems": 100,
+            "description": "Target Nasmyth 1 rotator angle at 100Hz beginning at the specified time.",
+            "items": [
+                {
+                    "type": "number"
+                }
+            ]
+        },
+        "nasmyth1RotatorAngleVelocity": {
+            "type": "array",
+            "minItems": 100,
+            "maxItems": 100,
+            "description": "Target Nasmyth 1 rotator angle velocity at 100Hz beginning at the specified time.",
+            "items": [
+                {
+                    "type": "number"
+                }
+            ]
+        },
+        "nasmyth2RotatorAngle": {
+            "type": "array",
+            "minItems": 100,
+            "maxItems": 100,
+            "description": "Target Nasmyth 1 rotator angle at 100Hz beginning at the specified time.",
+            "items": [
+                {
+                    "type": "number"
+                }
+            ]
+        },
+        "nasmyth2RotatorAngleVelocity": {
+            "type": "array",
+            "minItems": 100,
+            "maxItems": 100,
+            "description": "Target Nasmyth 1 rotator angle velocity at 100Hz beginning at the specified time.",
+            "items": [
+                {
+                    "type": "number"
+                }
+            ]
+        }
+    },
+    "required": [
+        "id",
+        "cRIO_timestamp",
+        "elevation",
+        "elevationVelocity",
+        "azimuth",
+        "azimuthVelocity",
+        "nasmyth1RotatorAngle",
+        "nasmyth1RotatorAngleVelocity",
+        "nasmyth2RotatorAngle",
+        "nasmyth2RotatorAngleVelocity"
+    ],
+    "additionalProperties": false
+}

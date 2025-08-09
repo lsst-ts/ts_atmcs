@@ -1,6 +1,6 @@
-# This file is part of ts_atmcssimulator.
+# This file is part of ts_atmcs.
 #
-# Developed for the LSST Data Management System.
+# # Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
 # This product includes software developed by the LSST Project
 # (https://www.lsst.org).
 # See the COPYRIGHT file at the top-level directory of this distribution
@@ -20,8 +20,11 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 try:
-    from .version import *
+    from .version import __version__
 except ImportError:
     __version__ = "?"
 
+from .dataclasses import *
+from .enums import *
 from .mcs_csc import *
+from .mcs_simulator import *
