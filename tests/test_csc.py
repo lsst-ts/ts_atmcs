@@ -1,4 +1,4 @@
-# This file is part of ts_atmcssimulator.
+# This file is part of ts_atmcs.
 #
 # # Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
 # This product includes software developed by the LSST Project
@@ -26,7 +26,7 @@ from typing import Any
 
 import numpy as np
 import pytest
-from lsst.ts import atmcssimulator, salobj, simactuators, utils
+from lsst.ts import atmcs, salobj, simactuators, utils
 from lsst.ts.xml import sal_enums
 from lsst.ts.xml.enums.ATMCS import AtMountState, M3ExitPort, M3State
 
@@ -102,15 +102,14 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         config_dir: str,
         override: str = "",
         **kwargs: Any,
-    ) -> atmcssimulator.ATMCSCsc:
-        return atmcssimulator.ATMCSCsc(
+    ) -> atmcs.ATMCSCsc:
+        return atmcs.ATMCSCsc(
             initial_state=initial_state,
             config_dir=config_dir,
             simulation_mode=1,
             override=override,
         )
 
-    @pytest.mark.skip
     async def test_initial_info(self) -> None:
         """Check that all events and telemetry are output at startup
 
@@ -123,7 +122,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await self.csc.simulator.configure()
             await self.assert_next_sample(
                 topic=self.remote.evt_softwareVersions,
-                cscVersion=atmcssimulator.__version__ + "-sim",
+                cscVersion=atmcs.__version__,
                 subsystemVersions="",
             )
 
@@ -135,6 +134,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                     "softwareVersions",  # already read
                     "logMessage",  # not reliably output
                     "detailedState",  # not output by the simulator
+                    "configurationsAvailable",  # not output by the simulator
                 ):
                     continue
                 with self.subTest(event_name=event_name):
@@ -148,7 +148,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                     await tel.next(flush=False, timeout=timeout)
                 timeout = 0.1
 
-    @pytest.mark.skip
     async def test_invalid_track_target(self) -> None:
         """Test all reasons trackTarget may be rejected."""
         async with self.make_csc(
@@ -223,8 +222,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 self.remote.evt_atMountState, state=AtMountState.TRACKINGDISABLED
             )
 
-            for axis in atmcssimulator.Axis:
-                if axis is atmcssimulator.Axis.M3:
+            for axis in atmcs.Axis:
+                if axis is atmcs.Axis.M3:
                     continue  # trackTarget doesn't accept M3
 
                 with self.subTest(axis=axis):
@@ -315,17 +314,11 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                     flush=False, timeout=VERY_SHORT_TIMEOUT
                 )
 
-            # Send to DISABLED state; still no events.
             await self.remote.cmd_start.start()
-            with pytest.raises(asyncio.TimeoutError):
-                await self.remote.evt_azimuthBrake1.next(
-                    flush=False, timeout=VERY_SHORT_TIMEOUT
-                )
 
             # Send to ENABLED state; this should enable
             # elevation, azimuth and NA2 axes.
             await self.remote.cmd_enable.start()
-            await self.csc.simulator.configure()
 
             for event in self.brake_events:
                 if event is self.remote.evt_nasmyth2Brake:
@@ -410,7 +403,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 self.remote.evt_nasmyth1DriveStatus, enable=False
             )
             data = self.remote.evt_nasmyth2DriveStatus.get()
-            assert not (data.enable)
+            assert not data.enable
 
             start_tai = utils.current_tai()
 
@@ -420,7 +413,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             with salobj.assertRaisesAckError():
                 await self.remote.cmd_startTracking.start()
 
-            actuator = self.csc.simulator.actuators[atmcssimulator.Axis.M3]
+            actuator = self.csc.simulator.actuators[atmcs.Axis.M3]
             curr_segment = actuator.path.at(utils.current_tai())
             assert curr_segment.velocity != 0
 
@@ -469,9 +462,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             assert not data.enable
 
     async def test_bin_script(self) -> None:
-        await self.check_bin_script(
-            name="ATMCS", index=None, exe_name="run_atmcs_simulator"
-        )
+        await self.check_bin_script(name="ATMCS", index=None, exe_name="run_atmcs")
 
     async def test_track(self) -> None:
         async with self.make_csc(
@@ -801,7 +792,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         ):
             await self.remote.cmd_start.start()
             await self.csc.simulator.configure()
-            assert self.csc.simulator.simulator_state == sal_enums.State.DISABLED
+            assert self.csc.simulator.simulator_state == sal_enums.State.STANDBY
 
             await self.remote.cmd_enable.start()
             assert self.csc.simulator.simulator_state == sal_enums.State.ENABLED
@@ -810,34 +801,18 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             assert self.csc.simulator.simulator_state == sal_enums.State.DISABLED
 
             await self.remote.cmd_standby.start()
-            assert self.csc.simulator.simulator_state == sal_enums.State.STANDBY
+            assert self.csc.simulator is None
 
             await self.remote.cmd_start.start()
-            assert self.csc.simulator.simulator_state == sal_enums.State.DISABLED
+            assert self.csc.simulator is not None
+            assert self.csc.simulator.simulator_state == sal_enums.State.STANDBY
 
             await self.remote.cmd_enable.start()
+            assert self.csc.simulator is not None
             assert self.csc.simulator.simulator_state == sal_enums.State.ENABLED
 
             await self.remote.cmd_disable.start()
             assert self.csc.simulator.simulator_state == sal_enums.State.DISABLED
 
             await self.remote.cmd_standby.start()
-            assert self.csc.simulator.simulator_state == sal_enums.State.STANDBY
-
-    async def test_csc_with_fault_state(self) -> None:
-        async with self.make_csc(
-            initial_state=salobj.State.STANDBY, config_dir=CONFIG_DIR
-        ):
-            await self.remote.cmd_start.start()
-            await self.csc.simulator.configure()
-            assert self.csc.simulator.simulator_state == sal_enums.State.DISABLED
-
-            await self.remote.cmd_standby.start()
-            assert self.csc.simulator.simulator_state == sal_enums.State.STANDBY
-
-            self.csc.simulator.go_to_fault_state = True
-            await self.remote.cmd_start.set_start()
-            assert self.csc.simulator.simulator_state == sal_enums.State.FAULT
-
-            await self.remote.cmd_standby.set_start()
-            assert self.csc.simulator.simulator_state == sal_enums.State.STANDBY
+            assert self.csc.simulator is None

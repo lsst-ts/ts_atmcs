@@ -1,4 +1,4 @@
-# This file is part of ts_atmcssimulator.
+# This file is part of ts_atmcs.
 #
 # # Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
 # This product includes software developed by the LSST Project
@@ -26,7 +26,7 @@ import yaml
 CONFIG_SCHEMA = yaml.safe_load(
     """
     $schema: http://json-schema.org/draft-07/schema#
-    $id: https://github.com/lsst-ts/ts_atmcssimulator/blob/main/python/lsst/ts/atmcssimulator/config_schema.py
+    $id: https://github.com/lsst-ts/ts_atmcs/blob/main/python/lsst/ts/atmcs/config_schema.py
     title: ATMCS v1
     description: Schema for ATMCS CSC configuration files.
     type: object

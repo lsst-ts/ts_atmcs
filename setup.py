@@ -1,4 +1,4 @@
-# This file is part of ts_atmcssimulator.
+# This file is part of ts_atmcs.
 #
 # # Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
 # This product includes software developed by the LSST Project
@@ -19,7 +19,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import setuptools
 import setuptools_scm
-from setuptools import setup
 
-setup(version=setuptools_scm.get_version())
+setuptools.setup(
+    version=setuptools_scm.get_version(write_to="python/lsst/ts/atmcs/version.py")
+)

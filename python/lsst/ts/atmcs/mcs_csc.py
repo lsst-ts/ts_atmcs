@@ -1,4 +1,4 @@
-# This file is part of ts_atmcssimulator.
+# This file is part of ts_atmcs.
 #
 # # Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
 # This product includes software developed by the LSST Project
@@ -19,7 +19,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-__all__ = ["ATMCSCsc", "run_atmcs_simulator"]
+__all__ = ["ATMCSCsc", "run_atmcs"]
 
 import asyncio
 import pathlib
@@ -33,7 +33,7 @@ from .mcs_simulator import McsSimulator
 
 
 class ATMCSCsc(attcpip.AtTcpipCsc):
-    """Simulator for auxiliary telescope motor control system CSC.
+    """CSC for auxiliary telescope motor control system.
 
     Parameters
     ----------
@@ -42,9 +42,7 @@ class ATMCSCsc(attcpip.AtTcpipCsc):
         as real CSCs should start up in `State.STANDBY`, the default.
     """
 
-    # TODO DM-39357 Remove these lines.
-    # Append "-sim" to avoid confusion with the real ATMCS CSC.
-    version = f"{__version__}-sim"
+    version = __version__
 
     def __init__(
         self,
@@ -74,47 +72,60 @@ class ATMCSCsc(attcpip.AtTcpipCsc):
                 cmd_evt_port=self.config.cmd_evt_port,
                 telemetry_port=self.config.telemetry_port,
             )
+            await self.simulator.configure()
         await super().start_clients()
 
     async def do_startTracking(self, data: salobj.BaseMsgType) -> None:
         self.assert_enabled("startTracking")
-        command_issued = await self.write_command(command=Command.START_TRACKING)
-        await command_issued.done
+        await self.cmd_startTracking.ack_in_progress(data, self.cmd_done_timeout)
+        self.log.debug("Sending startTracking.")
+        async with asyncio.timeout(self.cmd_done_timeout):
+            command_issued = await self.write_command(command=Command.START_TRACKING)
+            await command_issued.done
 
     async def do_trackTarget(self, data: salobj.BaseMsgType) -> None:
         self.assert_enabled("trackTarget")
-        # command_issued = await self.write_command(
-        await self.write_command(
-            command=Command.TRACK_TARGET,
-            azimuth=data.azimuth,
-            azimuthVelocity=data.azimuthVelocity,
-            elevation=data.elevation,
-            elevationVelocity=data.elevationVelocity,
-            nasmyth1RotatorAngle=data.nasmyth1RotatorAngle,
-            nasmyth1RotatorAngleVelocity=data.nasmyth1RotatorAngleVelocity,
-            nasmyth2RotatorAngle=data.nasmyth2RotatorAngle,
-            nasmyth2RotatorAngleVelocity=data.nasmyth2RotatorAngleVelocity,
-            taiTime=data.taiTime,
-            trackId=data.trackId,
-            tracksys=data.tracksys,
-            radesys=data.radesys,
-        )
-        # await command_issued.done
+        await self.cmd_trackTarget.ack_in_progress(data, self.cmd_done_timeout)
+        self.log.debug("Sending trackTarget.")
+        async with asyncio.timeout(self.cmd_done_timeout):
+            command_issued = await self.write_command(
+                command=Command.TRACK_TARGET,
+                azimuth=data.azimuth,
+                azimuthVelocity=data.azimuthVelocity,
+                elevation=data.elevation,
+                elevationVelocity=data.elevationVelocity,
+                nasmyth1RotatorAngle=data.nasmyth1RotatorAngle,
+                nasmyth1RotatorAngleVelocity=data.nasmyth1RotatorAngleVelocity,
+                nasmyth2RotatorAngle=data.nasmyth2RotatorAngle,
+                nasmyth2RotatorAngleVelocity=data.nasmyth2RotatorAngleVelocity,
+                taiTime=data.taiTime,
+                trackId=data.trackId,
+                tracksys=data.tracksys,
+                radesys=data.radesys,
+            )
+            if self.simulation_mode == 1:
+                await command_issued.done
 
     async def do_setInstrumentPort(self, data: salobj.BaseMsgType) -> None:
         self.assert_enabled("setInstrumentPort")
-        port = data.port
-        command_issued = await self.write_command(
-            command=Command.SET_INSTRUMENT_PORT, port=port
-        )
-        await command_issued.done
+        await self.cmd_setInstrumentPort.ack_in_progress(data, self.cmd_done_timeout)
+        self.log.debug("Sending setInstrumentPort.")
+        async with asyncio.timeout(self.cmd_done_timeout):
+            port = data.port
+            command_issued = await self.write_command(
+                command=Command.SET_INSTRUMENT_PORT, port=port
+            )
+            await command_issued.done
 
     async def do_stopTracking(self, data: salobj.BaseMsgType) -> None:
         self.assert_enabled("stopTracking")
-        command_issued = await self.write_command(command=Command.STOP_TRACKING)
-        await command_issued.done
+        await self.cmd_stopTracking.ack_in_progress(data, self.cmd_done_timeout)
+        self.log.debug("Sending stopTracking.")
+        async with asyncio.timeout(self.cmd_done_timeout):
+            command_issued = await self.write_command(command=Command.STOP_TRACKING)
+            await command_issued.done
 
 
-def run_atmcs_simulator() -> None:
-    """Run the ATMCS CSC simulator."""
+def run_atmcs() -> None:
+    """Run the ATMCS CSC."""
     asyncio.run(ATMCSCsc.amain(index=None))

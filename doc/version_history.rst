@@ -1,35 +1,12 @@
-.. py:currentmodule:: lsst.ts.
+.. py:currentmodule:: lsst.ts.atmcs
 
-.. _lsst.ts.atmcssimulator.version_history:
+.. _lsst.ts.atmcs.version_history:
 
 ###############
 Version History
 ###############
 
-v2.0.0
-------
-
-* Modernize Jenkinsfile.
-* Add JSON schemas for command, event and telemetry exchange via TCP/IP.
-* Add MTC simulator and simulator server for testing the TCP/IP interaction with the real ATMCS server.
-* Move simulation code mostly unchanged from the CSC to the simulator.
-* Remove all simulator code from the CSC and connect to the simulator via TCP/IP.
-* Make ATMCSCsc a Configurable CSC.
-* Reorganize constants and event information.
-* Add support for sending start, disable, enable and standby commands.
-* Fix typo in the "ATMCS_nasmyth_m3_mountMotorEncoders" telemetry topic name.
-* Add support for summary state, detailed state and errorCode events and for FAULT state.
-* Support simulation mode 0.
-* Update the version of ts-conda-build to 0.4 in the conda recipe.
-
-Requires:
-
-* ts_salobj 7.1
-* ts_tcpip 1.2
-* ts_utils 1
-* ts_simactuators 2
-* ts_idl 2
-* IDL file for ATMCS built from ts_xml 11
+.. towncrier release notes start
 
 v1.5.2
 ------

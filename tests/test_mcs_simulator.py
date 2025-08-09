@@ -1,4 +1,4 @@
-# This file is part of ts_atmcssimulator.
+# This file is part of ts_atmcs.
 #
 # # Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
 # This product includes software developed by the LSST Project
@@ -26,19 +26,19 @@ import typing
 import unittest
 
 import jsonschema
-from lsst.ts import atmcssimulator, attcpip, tcpip, utils
+from lsst.ts import atmcs, attcpip, tcpip, utils
 from lsst.ts.xml import sal_enums
 
 # Standard timeout in seconds.
 TIMEOUT = 2
 
 EVENTS_TO_NOT_EXPECT = {
-    atmcssimulator.Event.DETAILEDSTATE,
-    atmcssimulator.Event.M3PORTSELECTED,
-    atmcssimulator.Event.POSITIONLIMITS,
-    atmcssimulator.Event.TARGET,
+    atmcs.Event.DETAILEDSTATE,
+    atmcs.Event.M3PORTSELECTED,
+    atmcs.Event.POSITIONLIMITS,
+    atmcs.Event.TARGET,
 }
-EVENTS_TO_EXPECT = set(atmcssimulator.Event) - EVENTS_TO_NOT_EXPECT
+EVENTS_TO_EXPECT = set(atmcs.Event) - EVENTS_TO_NOT_EXPECT
 
 
 class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
@@ -48,8 +48,8 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
     @contextlib.asynccontextmanager
     async def create_mcs_simulator(
         self, go_to_fault_state: bool
-    ) -> typing.AsyncGenerator[atmcssimulator.McsSimulator, None]:
-        async with atmcssimulator.McsSimulator(
+    ) -> typing.AsyncGenerator[atmcs.McsSimulator, None]:
+        async with atmcs.McsSimulator(
             host=tcpip.LOCALHOST_IPV4, cmd_evt_port=5000, telemetry_port=6000
         ) as simulator:
             simulator.go_to_fault_state = go_to_fault_state
@@ -60,7 +60,7 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
 
     @contextlib.asynccontextmanager
     async def create_cmd_evt_client(
-        self, simulator: atmcssimulator.McsSimulator
+        self, simulator: atmcs.McsSimulator
     ) -> typing.AsyncGenerator[tcpip.Client, None]:
         async with tcpip.Client(
             host=simulator.cmd_evt_server.host,
@@ -74,14 +74,14 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
             assert simulator.cmd_evt_server.connected
             assert cmd_evt_client.connected
             await self.verify_event(
-                client=cmd_evt_client, evt_name=atmcssimulator.Event.POSITIONLIMITS
+                client=cmd_evt_client, evt_name=atmcs.Event.POSITIONLIMITS
             )
             await self.verify_almost_all_events(client=cmd_evt_client)
             yield cmd_evt_client
 
     @contextlib.asynccontextmanager
     async def create_telemetry_client(
-        self, simulator: atmcssimulator.McsSimulator
+        self, simulator: atmcs.McsSimulator
     ) -> typing.AsyncGenerator[tcpip.Client, None]:
         async with tcpip.Client(
             host=simulator.telemetry_server.host,
@@ -108,6 +108,8 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
     async def verify_almost_all_events(self, client: tcpip.Client) -> None:
         for _ in range(len(EVENTS_TO_EXPECT)):
             data = await client.read_json()
+            if data[attcpip.CommonCommandArgument.ID] == "evt_summaryState":
+                continue
             # No need for asserts here. If the data id is not present in
             # registry or the validation of the schema fails, the test will
             # fail as well.
@@ -142,7 +144,7 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
                 data={
                     attcpip.CommonCommandArgument.ID: "cmd_setInstrumentPort",
                     attcpip.CommonCommandArgument.SEQUENCE_ID: sequence_id,
-                    atmcssimulator.CommandArgument.PORT: port,
+                    atmcs.CommandArgument.PORT: port,
                 }
             )
             await self.verify_command_response(
@@ -151,7 +153,7 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
                 sequence_id=sequence_id,
             )
             await self.verify_event(
-                client=cmd_evt_client, evt_name=atmcssimulator.Event.M3PORTSELECTED
+                client=cmd_evt_client, evt_name=atmcs.Event.M3PORTSELECTED
             )
             await self.verify_command_response(
                 client=cmd_evt_client,
@@ -167,7 +169,7 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
                 data={
                     attcpip.CommonCommandArgument.ID: "cmd_setInstrumentPort",
                     attcpip.CommonCommandArgument.SEQUENCE_ID: sequence_id,
-                    atmcssimulator.CommandArgument.PORT: port,
+                    atmcs.CommandArgument.PORT: port,
                 }
             )
             await self.verify_command_response(
@@ -240,18 +242,18 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
                 data={
                     attcpip.CommonCommandArgument.ID: "cmd_trackTarget",
                     attcpip.CommonCommandArgument.SEQUENCE_ID: sequence_id,
-                    atmcssimulator.CommandArgument.AZIMUTH: 0.0,
-                    atmcssimulator.CommandArgument.AZIMUTH_VELOCITY: 0.0,
-                    atmcssimulator.CommandArgument.ELEVATION: 10.0,
-                    atmcssimulator.CommandArgument.ELEVATION_VELOCITY: 0.0,
-                    atmcssimulator.CommandArgument.NASMYTH1_ROTATOR_ANGLE: 0.0,
-                    atmcssimulator.CommandArgument.NASMYTH1_ROTATOR_ANGLE_VELOCITY: 0.0,
-                    atmcssimulator.CommandArgument.NASMYTH2_ROTATOR_ANGLE: 0.0,
-                    atmcssimulator.CommandArgument.NASMYTH2_ROTATOR_ANGLE_VELOCITY: 0.0,
-                    atmcssimulator.CommandArgument.RA_DE_SYS: "ICRS",
-                    atmcssimulator.CommandArgument.TAI_TIME: utils.current_tai(),
-                    atmcssimulator.CommandArgument.TRACK_ID: 1,
-                    atmcssimulator.CommandArgument.TRACK_SYS: "sidereal",
+                    atmcs.CommandArgument.AZIMUTH: 0.0,
+                    atmcs.CommandArgument.AZIMUTH_VELOCITY: 0.0,
+                    atmcs.CommandArgument.ELEVATION: 10.0,
+                    atmcs.CommandArgument.ELEVATION_VELOCITY: 0.0,
+                    atmcs.CommandArgument.NASMYTH1_ROTATOR_ANGLE: 0.0,
+                    atmcs.CommandArgument.NASMYTH1_ROTATOR_ANGLE_VELOCITY: 0.0,
+                    atmcs.CommandArgument.NASMYTH2_ROTATOR_ANGLE: 0.0,
+                    atmcs.CommandArgument.NASMYTH2_ROTATOR_ANGLE_VELOCITY: 0.0,
+                    atmcs.CommandArgument.RA_DE_SYS: "ICRS",
+                    atmcs.CommandArgument.TAI_TIME: utils.current_tai(),
+                    atmcs.CommandArgument.TRACK_ID: 1,
+                    atmcs.CommandArgument.TRACK_SYS: "sidereal",
                 }
             )
             await self.verify_command_response(
@@ -259,9 +261,7 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
                 ack=attcpip.Ack.ACK,
                 sequence_id=sequence_id,
             )
-            await self.verify_event(
-                client=cmd_evt_client, evt_name=atmcssimulator.Event.TARGET
-            )
+            await self.verify_event(client=cmd_evt_client, evt_name=atmcs.Event.TARGET)
             await self.verify_command_response(
                 client=cmd_evt_client,
                 ack=attcpip.Ack.SUCCESS,
@@ -320,7 +320,7 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
             )
             await self.verify_command_response(
                 client=cmd_evt_client,
-                ack=attcpip.Ack.NOACK,
+                ack=attcpip.Ack.ACK,
                 sequence_id=sequence_id,
             )
 
@@ -343,7 +343,7 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
             # No need to call ``simulator.update_telemetry`` explicitly since
             # connecting with a cmd_evt_client starts the event and telemetry
             # loop.
-            for _ in atmcssimulator.Telemetry:
+            for _ in atmcs.Telemetry:
                 data = await telemetry_client.read_json()
                 # No need for asserts here. If the data id is not present in
                 # registry or the validation of the schema fails, the test will

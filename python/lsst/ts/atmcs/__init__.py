@@ -1,4 +1,4 @@
-# This file is part of ts_atmcssimulator.
+# This file is part of ts_atmcs.
 #
 # # Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
 # This product includes software developed by the LSST Project
@@ -20,7 +20,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 try:
-    from .version import *
+    from .version import __version__
 except ImportError:
     __version__ = "?"
 
