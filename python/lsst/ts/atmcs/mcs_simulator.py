@@ -327,18 +327,31 @@ class McsSimulator(attcpip.AtSimulator):
         port : `int`
             The port to set.
         """
+        fail_reason = "do_set_instrument_port failed"
         if self._tracking_enabled:
-            await self.write_fail_response(sequence_id=sequence_id)
+            await self.write_fail_response(
+                sequence_id=sequence_id,
+                reason=fail_reason,
+                error_details="Tracking is enabled",
+            )
             return
         try:
             m3_port_positions_ind = PORT_INFO_DICT[port].index
         except KeyError:
-            await self.write_fail_response(sequence_id=sequence_id)
+            await self.write_fail_response(
+                sequence_id=sequence_id,
+                reason=fail_reason,
+                error_details=f"Invalid {port=}",
+            )
             return
         try:
             m3_port_positions = self.m3_port_positions[m3_port_positions_ind]
         except KeyError:
-            await self.write_fail_response(sequence_id=sequence_id)
+            await self.write_fail_response(
+                sequence_id=sequence_id,
+                reason=fail_reason,
+                error_details=f"Invalid {m3_port_positions_ind=}",
+            )
             return
         await self._write_evt(evt_id=Event.M3PORTSELECTED, selected=port)
         m3actuator = self.actuators[Axis.M3]
@@ -365,12 +378,21 @@ class McsSimulator(attcpip.AtSimulator):
         sequence_id : `int`
             The command sequence id.
         """
+        fail_reason = "do_start_tracking failed"
         m3_in_position = self.m3_in_position(utils.current_tai())
         if not m3_in_position:
-            await self.write_fail_response(sequence_id=sequence_id)
+            await self.write_fail_response(
+                sequence_id=sequence_id,
+                reason=fail_reason,
+                error_details="M3 not in position",
+            )
             return
         if not self._stop_tracking_task.done():
-            await self.write_fail_response(sequence_id=sequence_id)
+            await self.write_fail_response(
+                sequence_id=sequence_id,
+                reason=fail_reason,
+                error_details="Already tracking",
+            )
             return
         self._tracking_enabled = True
         await self.update_events()
@@ -385,8 +407,13 @@ class McsSimulator(attcpip.AtSimulator):
         sequence_id : `int`
             The command sequence id.
         """
+        fail_reason = "do_stop_tracking failed"
         if not self._stop_tracking_task.done():
-            await self.write_fail_response(sequence_id=sequence_id)
+            await self.write_fail_response(
+                sequence_id=sequence_id,
+                reason=fail_reason,
+                error_details="Already tracking",
+            )
             return
         self._set_tracking_timer(restart=False)
         self._tracking_enabled = False
@@ -449,8 +476,13 @@ class McsSimulator(attcpip.AtSimulator):
             Coordinate reference frame of RA/DEC axes, e.g. "FK5" or "ICRS".
             The value is not checked.
         """
+        fail_reason = "do_track_target failed"
         if not self._tracking_enabled:
-            await self.write_fail_response(sequence_id=sequence_id)
+            await self.write_fail_response(
+                sequence_id=sequence_id,
+                reason=fail_reason,
+                error_details="Tracking not enabled",
+            )
             return
         try:
             position = np.array(
@@ -476,13 +508,25 @@ class McsSimulator(attcpip.AtSimulator):
             if np.any(current_position < self.min_commanded_position[0:4]) or np.any(
                 current_position > self.max_commanded_position[0:4]
             ):
-                await self.write_fail_response(sequence_id=sequence_id)
+                await self.write_fail_response(
+                    sequence_id=sequence_id,
+                    reason=fail_reason,
+                    error_details="Commanded position out of range",
+                )
                 return
             if np.any(np.abs(velocity) > self.max_velocity[0:4]):
-                await self.write_fail_response(sequence_id=sequence_id)
+                await self.write_fail_response(
+                    sequence_id=sequence_id,
+                    reason=fail_reason,
+                    error_details="Commanded velocity too high",
+                )
                 return
-        except Exception:
-            await self.write_fail_response(sequence_id=sequence_id)
+        except Exception as e:
+            await self.write_fail_response(
+                sequence_id=sequence_id,
+                reason=fail_reason,
+                error_details=f"Exception: {e}",
+            )
             return
 
         for i in range(4):
