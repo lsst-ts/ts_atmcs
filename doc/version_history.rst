@@ -8,6 +8,15 @@ Version History
 
 .. towncrier release notes start
 
+v2.1.0 (2025-09-10)
+===================
+
+Performance Enhancement
+-----------------------
+
+- Added support for changes in ts_attcpip. (`OSW-884 <https://rubinobs.atlassian.net//browse/OSW-884>`_)
+
+
 v2.0.0 (2025-08-09)
 ===================
 
