@@ -189,7 +189,6 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
             data={
                 attcpip.CommonCommandArgument.ID: "cmd_startTracking",
                 attcpip.CommonCommandArgument.SEQUENCE_ID: sequence_id,
-                attcpip.CommonCommandArgument.VALUE: True,
             }
         )
         await self.verify_command_response(
@@ -215,7 +214,6 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
                 data={
                     attcpip.CommonCommandArgument.ID: "cmd_stopTracking",
                     attcpip.CommonCommandArgument.SEQUENCE_ID: sequence_id,
-                    attcpip.CommonCommandArgument.VALUE: True,
                 }
             )
             await self.verify_command_response(
@@ -294,7 +292,6 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
                 data={
                     attcpip.CommonCommandArgument.ID: "cmd_startTracking",
                     attcpip.CommonCommandArgument.SEQUENCE_ID: sequence_id,
-                    attcpip.CommonCommandArgument.VALUE: True,
                 }
             )
             await self.verify_command_response(
@@ -315,7 +312,6 @@ class McsSimulatorTestCase(unittest.IsolatedAsyncioTestCase):
                 data={
                     attcpip.CommonCommandArgument.ID: "cmd_stopTracking",
                     attcpip.CommonCommandArgument.SEQUENCE_ID: sequence_id,
-                    attcpip.CommonCommandArgument.VALUE: True,
                 }
             )
             await self.verify_command_response(
