@@ -183,7 +183,7 @@ class McsSimulator(attcpip.AtSimulator):
         max_velocity: np.ndarray = np.array([5, 5, 5, 5, 5], dtype=float),
         max_acceleration: np.ndarray = np.array([3, 3, 3, 3, 3], dtype=float),
         topple_azimuth: np.ndarray = np.array([2, 5], dtype=float),
-        m3_port_positions: np.ndarray = np.array([0, 180, 90], dtype=float),
+        m3_port_positions: np.ndarray = np.array([180, 0, 90], dtype=float),
         axis_encoder_counts_per_deg: np.ndarray = np.array(
             [3.6e6, 3.6e6, 3.6e6, 3.6e6, 3.6e6], dtype=float
         ),
@@ -380,6 +380,7 @@ class McsSimulator(attcpip.AtSimulator):
         """
         fail_reason = "do_start_tracking failed"
         m3_in_position = self.m3_in_position(utils.current_tai())
+        self._tracking_enabled = False
         if not m3_in_position:
             await self.write_fail_response(
                 sequence_id=sequence_id,
@@ -594,12 +595,12 @@ class McsSimulator(attcpip.AtSimulator):
               as an Axis enum value, or None if the port has no rotator.
         """
         if not self.m3_in_position(tai):
-            return (None, None)
+            return None, None
         target_position = self.actuators[Axis.M3].target.position
         for exit_port, port_info in PORT_INFO_DICT.items():
             if self.m3_port_positions[port_info.index] == target_position:
-                return (exit_port, port_info.axis)
-        return (None, None)
+                return exit_port, port_info.axis
+        return None, None
 
     def m3_in_position(self, tai: float) -> bool:
         """Is the M3 actuator in position?
