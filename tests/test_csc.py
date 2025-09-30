@@ -310,7 +310,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             # No events get emitted since no connection has been made yet to
             # the remote ATMCS system.
             with pytest.raises(asyncio.TimeoutError):
-                await self.remote.evt_azimuthBrake1.next(
+                await self.remote.evt_azimuthBrake2.next(
                     flush=False, timeout=VERY_SHORT_TIMEOUT
                 )
 
@@ -321,13 +321,13 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await self.remote.cmd_enable.start()
 
             for event in self.brake_events:
-                if event is self.remote.evt_nasmyth2Brake:
+                if event is self.remote.evt_nasmyth1Brake:
                     continue
                 await self.assert_next_sample(event, engaged=False)
 
             for event in self.drive_status_events:
                 if event in (
-                    self.remote.evt_nasmyth2DriveStatus,
+                    self.remote.evt_nasmyth1DriveStatus,
                     self.remote.evt_m3DriveStatus,
                 ):
                     continue
@@ -337,7 +337,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await self.remote.cmd_disable.start()
 
             with pytest.raises(asyncio.TimeoutError):
-                await self.remote.evt_azimuthBrake1.next(
+                await self.remote.evt_azimuthBrake2.next(
                     flush=False, timeout=VERY_SHORT_TIMEOUT
                 )
 
@@ -378,13 +378,13 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
 
             await self.assert_next_sample(
-                self.remote.evt_m3State, state=M3State.NASMYTH1
+                self.remote.evt_m3State, state=M3State.NASMYTH2
             )
             await self.assert_next_sample(
-                self.remote.evt_nasmyth1DriveStatus, enable=True
+                self.remote.evt_nasmyth1DriveStatus, enable=False
             )
             await self.assert_next_sample(
-                self.remote.evt_nasmyth2DriveStatus, enable=False
+                self.remote.evt_nasmyth2DriveStatus, enable=True
             )
 
             await self.remote.cmd_setInstrumentPort.set_start(
@@ -397,12 +397,12 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 self.remote.evt_m3State, state=M3State.INMOTION
             )
 
-            # Nasmyth1 should now be disabled
-            # and Nasmyth1 should remain disabled.
+            # Nasmyth1 should remain disabled
+            # and Nasmyth2 should now be disabled.
             await self.assert_next_sample(
-                self.remote.evt_nasmyth1DriveStatus, enable=False
+                self.remote.evt_nasmyth2DriveStatus, enable=False
             )
-            data = self.remote.evt_nasmyth2DriveStatus.get()
+            data = self.remote.evt_nasmyth1DriveStatus.get()
             assert not data.enable
 
             start_tai = utils.current_tai()
@@ -490,7 +490,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
 
             await self.assert_next_sample(
-                self.remote.evt_m3State, state=M3State.NASMYTH1
+                self.remote.evt_m3State, state=M3State.NASMYTH2
             )
 
             # M3 should be in position, the other axes should not.
@@ -558,8 +558,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             for event in self.in_position_events:
                 if event is self.remote.evt_m3InPosition:
                     continue  # M3 was already in position.
-                if event is self.remote.evt_nasmyth2RotatorInPosition:
-                    continue  # Nasmyth2 is not in use.
+                if event is self.remote.evt_nasmyth1RotatorInPosition:
+                    continue  # Nasmyth1 is not in use.
                 await self.assert_next_sample(event, inPosition=True)
 
             await self.remote.cmd_stopTracking.start(timeout=SHORT_TIMEOUT)
@@ -595,7 +595,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
 
             await self.assert_next_sample(
-                self.remote.evt_m3State, state=M3State.NASMYTH1
+                self.remote.evt_m3State, state=M3State.NASMYTH2
             )
 
             await self.remote.cmd_startTracking.start(timeout=STD_TIMEOUT)
@@ -643,7 +643,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
 
             await self.assert_next_sample(
-                self.remote.evt_m3State, state=M3State.NASMYTH1
+                self.remote.evt_m3State, state=M3State.NASMYTH2
             )
 
             await self.remote.cmd_startTracking.start(timeout=STD_TIMEOUT)
