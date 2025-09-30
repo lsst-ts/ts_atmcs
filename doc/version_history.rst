@@ -8,6 +8,15 @@ Version History
 
 .. towncrier release notes start
 
+v2.1.1 (2025-09-30)
+===================
+
+Performance Enhancement
+-----------------------
+
+- Made NASMYTH2 the default port. (`OSW-1134 <https://rubinobs.atlassian.net//browse/OSW-1134>`_)
+
+
 v2.1.0 (2025-09-10)
 ===================
 
