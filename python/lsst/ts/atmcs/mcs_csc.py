@@ -67,11 +67,7 @@ class ATMCSCsc(attcpip.AtTcpipCsc):
 
     async def start_clients(self) -> None:
         if self.simulation_mode == 1 and self.simulator is None:
-            self.simulator = McsSimulator(
-                host=self.config.host,
-                cmd_evt_port=self.config.cmd_evt_port,
-                telemetry_port=self.config.telemetry_port,
-            )
+            self.simulator = McsSimulator(host=self.config.host, cmd_evt_port=0, telemetry_port=0)
             await self.simulator.configure()
         await super().start_clients()
 
