@@ -112,9 +112,7 @@ class ATMCSCsc(attcpip.AtTcpipCsc):
         self.log.debug("Sending setInstrumentPort.")
         async with asyncio.timeout(self.cmd_done_timeout):
             port = data.port
-            command_issued = await self.write_command(
-                command=Command.SET_INSTRUMENT_PORT, port=port
-            )
+            command_issued = await self.write_command(command=Command.SET_INSTRUMENT_PORT, port=port)
             await command_issued.done
 
     async def do_stopTracking(self, data: salobj.BaseMsgType) -> None:

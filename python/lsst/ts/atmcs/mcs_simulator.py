@@ -85,9 +85,7 @@ class McsSimulator(attcpip.AtSimulator):
     """
 
     def __init__(self, host: str, cmd_evt_port: int, telemetry_port: int) -> None:
-        super().__init__(
-            host=host, cmd_evt_port=cmd_evt_port, telemetry_port=telemetry_port
-        )
+        super().__init__(host=host, cmd_evt_port=cmd_evt_port, telemetry_port=telemetry_port)
 
         # Variables holding the data for the telemetry messages.
         self.azel_mountMotorEncoders = AzElMountMotorEncoders()
@@ -167,29 +165,17 @@ class McsSimulator(attcpip.AtSimulator):
     async def configure(
         self,
         max_tracking_interval: float = 2.5,
-        min_commanded_position: np.ndarray = np.array(
-            [5, -270, -165, -165, 0], dtype=float
-        ),
-        max_commanded_position: np.ndarray = np.array(
-            [90, 270, 165, 165, 180], dtype=float
-        ),
+        min_commanded_position: np.ndarray = np.array([5, -270, -165, -165, 0], dtype=float),
+        max_commanded_position: np.ndarray = np.array([90, 270, 165, 165, 180], dtype=float),
         start_position: np.ndarray = np.array([80, 0, 0, 0, 0], dtype=float),
-        min_limit_switch_position: np.ndarray = np.array(
-            [3, -272, -167, -167, -2], dtype=float
-        ),
-        max_limit_switch_position: np.ndarray = np.array(
-            [92, 272, 167, 167, 182], dtype=float
-        ),
+        min_limit_switch_position: np.ndarray = np.array([3, -272, -167, -167, -2], dtype=float),
+        max_limit_switch_position: np.ndarray = np.array([92, 272, 167, 167, 182], dtype=float),
         max_velocity: np.ndarray = np.array([5, 5, 5, 5, 5], dtype=float),
         max_acceleration: np.ndarray = np.array([3, 3, 3, 3, 3], dtype=float),
         topple_azimuth: np.ndarray = np.array([2, 5], dtype=float),
         m3_port_positions: np.ndarray = np.array([180, 0, 90], dtype=float),
-        axis_encoder_counts_per_deg: np.ndarray = np.array(
-            [3.6e6, 3.6e6, 3.6e6, 3.6e6, 3.6e6], dtype=float
-        ),
-        motor_encoder_counts_per_deg: np.ndarray = np.array(
-            [3.6e5, 3.6e5, 3.6e5, 3.6e5, 3.6e5], dtype=float
-        ),
+        axis_encoder_counts_per_deg: np.ndarray = np.array([3.6e6, 3.6e6, 3.6e6, 3.6e6, 3.6e6], dtype=float),
+        motor_encoder_counts_per_deg: np.ndarray = np.array([3.6e5, 3.6e5, 3.6e5, 3.6e5, 3.6e5], dtype=float),
         motor_axis_ratio: np.ndarray = np.array([100, 100, 100, 100, 100], dtype=float),
         torque_per_accel: np.ndarray = np.array([1, 1, 1, 1, 1], dtype=float),
         nsettle: int = 2,
@@ -531,9 +517,7 @@ class McsSimulator(attcpip.AtSimulator):
             return
 
         for i in range(4):
-            self.actuators[i].set_target(
-                tai=taiTime, position=position[i], velocity=velocity[i]
-            )
+            self.actuators[i].set_target(tai=taiTime, position=position[i], velocity=velocity[i])
 
         await self._write_evt(
             evt_id=Event.TARGET,
@@ -686,17 +670,10 @@ class McsSimulator(attcpip.AtSimulator):
             # Handle M3 actuator; set_target needs to be called to transition
             # from slewing to tracking, and that is done here for M3
             # (the trackPosition command does that for the other axes).
-            m3arrived = (
-                m3actuator.kind(tai) == m3actuator.Kind.Slewing
-                and tai > m3actuator.path[-1].tai
-            )
+            m3arrived = m3actuator.kind(tai) == m3actuator.Kind.Slewing and tai > m3actuator.path[-1].tai
             if m3arrived:
-                segment = simactuators.path.PathSegment(
-                    tai=tai, position=m3actuator.target.position
-                )
-                m3actuator.path = simactuators.path.Path(
-                    segment, kind=m3actuator.Kind.Stopped
-                )
+                segment = simactuators.path.PathSegment(tai=tai, position=m3actuator.target.position)
+                m3actuator.path = simactuators.path.Path(segment, kind=m3actuator.Kind.Stopped)
             exit_port, rot_axis = self.m3_port_rot(tai)
             if rot_axis is not None:
                 axes_in_use.add(rot_axis)
@@ -710,15 +687,11 @@ class McsSimulator(attcpip.AtSimulator):
             for axis in Axis:
                 await self._write_evt(
                     evt_id=AXIS_EVENT_DICT[axis].min_lim,
-                    active=bool(
-                        current_position[axis] < self.min_limit_switch_position[axis]
-                    ),
+                    active=bool(current_position[axis] < self.min_limit_switch_position[axis]),
                 )
                 await self._write_evt(
                     evt_id=AXIS_EVENT_DICT[axis].max_lim,
-                    active=bool(
-                        current_position[axis] > self.max_limit_switch_position[axis]
-                    ),
+                    active=bool(current_position[axis] > self.max_limit_switch_position[axis]),
                 )
                 if (
                     current_position[axis] < self.min_limit_switch_position[axis]
@@ -741,24 +714,17 @@ class McsSimulator(attcpip.AtSimulator):
             # Handle brakes
             for axis in Axis:
                 for brake_name in AXIS_EVENT_DICT[axis].brake:
-                    await self._write_evt(
-                        evt_id=brake_name, engaged=bool(not self._axis_enabled[axis])
-                    )
+                    await self._write_evt(evt_id=brake_name, engaged=bool(not self._axis_enabled[axis]))
 
             # Handle drive status (which means enabled)
             for axis in Axis:
                 for evt_name in AXIS_EVENT_DICT[axis].drive_status:
-                    await self._write_evt(
-                        evt_id=evt_name, enable=bool(self._axis_enabled[axis])
-                    )
+                    await self._write_evt(evt_id=evt_name, enable=bool(self._axis_enabled[axis]))
 
             # Handle atMountState
             if self._tracking_enabled:
                 mount_state = AtMountState.TRACKINGENABLED
-            elif (
-                not self._stop_tracking_task.done()
-                or not self._disable_all_drives_task.done()
-            ):
+            elif not self._stop_tracking_task.done() or not self._disable_all_drives_task.done():
                 mount_state = AtMountState.STOPPING
             else:
                 mount_state = AtMountState.TRACKINGDISABLED
@@ -786,9 +752,7 @@ class McsSimulator(attcpip.AtSimulator):
             # and actuator.kind(tai) is tracking.
             if not self._tracking_enabled:
                 for axis in MainAxes:
-                    await self._write_evt(
-                        evt_id=AXIS_EVENT_DICT[axis].in_position, inPosition=False
-                    )
+                    await self._write_evt(evt_id=AXIS_EVENT_DICT[axis].in_position, inPosition=False)
                 await self._write_evt(evt_id=Event.ALLAXESINPOSITION, inPosition=False)
             else:
                 all_in_position = m3_in_position
@@ -800,12 +764,8 @@ class McsSimulator(attcpip.AtSimulator):
                         in_position = actuator.kind(tai) == actuator.Kind.Tracking
                     if not in_position and axis in axes_in_use:
                         all_in_position = False
-                    await self._write_evt(
-                        evt_id=AXIS_EVENT_DICT[axis].in_position, inPosition=in_position
-                    )
-                await self._write_evt(
-                    evt_id=Event.ALLAXESINPOSITION, inPosition=all_in_position
-                )
+                    await self._write_evt(evt_id=AXIS_EVENT_DICT[axis].in_position, inPosition=in_position)
+                await self._write_evt(evt_id=Event.ALLAXESINPOSITION, inPosition=all_in_position)
 
             # compute m3_state for use setting m3State.state
             # and m3RotatorDetentSwitches
@@ -837,10 +797,7 @@ class McsSimulator(attcpip.AtSimulator):
                 3: "port3Active",
             }
             at_field = detent_map.get(m3_state, None)
-            detent_values = dict(
-                (field_name, field_name == at_field)
-                for field_name in detent_map.values()
-            )
+            detent_values = dict((field_name, field_name == at_field) for field_name in detent_map.values())
             await self._write_evt(evt_id=Event.M3ROTATORDETENTSWITCHES, **detent_values)
         except Exception:
             self.log.exception("update_events failed.")
@@ -864,27 +821,17 @@ class McsSimulator(attcpip.AtSimulator):
 
             for i, tai in enumerate(times):
                 segments = [actuator.path.at(tai) for actuator in self.actuators]
-                current_position = np.array(
-                    [segment.position for segment in segments], dtype=float
-                )
-                curr_vel = np.array(
-                    [segment.velocity for segment in segments], dtype=float
-                )
-                curr_accel = np.array(
-                    [segment.acceleration for segment in segments], dtype=float
-                )
+                current_position = np.array([segment.position for segment in segments], dtype=float)
+                curr_vel = np.array([segment.velocity for segment in segments], dtype=float)
+                curr_accel = np.array([segment.acceleration for segment in segments], dtype=float)
 
                 axis_encoder_counts = (
-                    (current_position * self.axis_encoder_counts_per_deg)
-                    .astype(int)
-                    .tolist()
+                    (current_position * self.axis_encoder_counts_per_deg).astype(int).tolist()
                 )
                 torque = curr_accel * self.torque_per_accel
                 motor_pos = current_position * self.motor_axis_ratio
                 motor_pos = (motor_pos + 360) % 360 - 360
-                motor_encoder_counts = (
-                    (motor_pos * self.motor_encoder_counts_per_deg).astype(int).tolist()
-                )
+                motor_encoder_counts = (motor_pos * self.motor_encoder_counts_per_deg).astype(int).tolist()
 
                 self.trajectory.elevation[i] = current_position[Axis.Elevation]
                 self.trajectory.azimuth[i] = current_position[Axis.Azimuth]
@@ -895,55 +842,23 @@ class McsSimulator(attcpip.AtSimulator):
                 self.trajectory.nasmyth1RotatorAngleVelocity[i] = curr_vel[Axis.NA1]
                 self.trajectory.nasmyth2RotatorAngleVelocity[i] = curr_vel[Axis.NA2]
 
-                self.mount_azel_encoders.elevationCalculatedAngle[i] = current_position[
-                    Axis.Elevation
-                ]
-                self.mount_azel_encoders.elevationEncoder1Raw[i] = axis_encoder_counts[
-                    Axis.Elevation
-                ]
-                self.mount_azel_encoders.elevationEncoder2Raw[i] = axis_encoder_counts[
-                    Axis.Elevation
-                ]
-                self.mount_azel_encoders.elevationEncoder3Raw[i] = axis_encoder_counts[
-                    Axis.Elevation
-                ]
-                self.mount_azel_encoders.azimuthCalculatedAngle[i] = current_position[
-                    Axis.Azimuth
-                ]
-                self.mount_azel_encoders.azimuthEncoder1Raw[i] = axis_encoder_counts[
-                    Axis.Azimuth
-                ]
-                self.mount_azel_encoders.azimuthEncoder2Raw[i] = axis_encoder_counts[
-                    Axis.Azimuth
-                ]
-                self.mount_azel_encoders.azimuthEncoder3Raw[i] = axis_encoder_counts[
-                    Axis.Azimuth
-                ]
+                self.mount_azel_encoders.elevationCalculatedAngle[i] = current_position[Axis.Elevation]
+                self.mount_azel_encoders.elevationEncoder1Raw[i] = axis_encoder_counts[Axis.Elevation]
+                self.mount_azel_encoders.elevationEncoder2Raw[i] = axis_encoder_counts[Axis.Elevation]
+                self.mount_azel_encoders.elevationEncoder3Raw[i] = axis_encoder_counts[Axis.Elevation]
+                self.mount_azel_encoders.azimuthCalculatedAngle[i] = current_position[Axis.Azimuth]
+                self.mount_azel_encoders.azimuthEncoder1Raw[i] = axis_encoder_counts[Axis.Azimuth]
+                self.mount_azel_encoders.azimuthEncoder2Raw[i] = axis_encoder_counts[Axis.Azimuth]
+                self.mount_azel_encoders.azimuthEncoder3Raw[i] = axis_encoder_counts[Axis.Azimuth]
 
-                self.mount_nasmyth_encoders.nasmyth1CalculatedAngle[i] = (
-                    current_position[Axis.NA1]
-                )
-                self.mount_nasmyth_encoders.nasmyth1Encoder1Raw[i] = (
-                    axis_encoder_counts[Axis.NA1]
-                )
-                self.mount_nasmyth_encoders.nasmyth1Encoder2Raw[i] = (
-                    axis_encoder_counts[Axis.NA1]
-                )
-                self.mount_nasmyth_encoders.nasmyth1Encoder3Raw[i] = (
-                    axis_encoder_counts[Axis.NA1]
-                )
-                self.mount_nasmyth_encoders.nasmyth2CalculatedAngle[i] = (
-                    current_position[Axis.NA2]
-                )
-                self.mount_nasmyth_encoders.nasmyth2Encoder1Raw[i] = (
-                    axis_encoder_counts[Axis.NA2]
-                )
-                self.mount_nasmyth_encoders.nasmyth2Encoder2Raw[i] = (
-                    axis_encoder_counts[Axis.NA2]
-                )
-                self.mount_nasmyth_encoders.nasmyth2Encoder3Raw[i] = (
-                    axis_encoder_counts[Axis.NA2]
-                )
+                self.mount_nasmyth_encoders.nasmyth1CalculatedAngle[i] = current_position[Axis.NA1]
+                self.mount_nasmyth_encoders.nasmyth1Encoder1Raw[i] = axis_encoder_counts[Axis.NA1]
+                self.mount_nasmyth_encoders.nasmyth1Encoder2Raw[i] = axis_encoder_counts[Axis.NA1]
+                self.mount_nasmyth_encoders.nasmyth1Encoder3Raw[i] = axis_encoder_counts[Axis.NA1]
+                self.mount_nasmyth_encoders.nasmyth2CalculatedAngle[i] = current_position[Axis.NA2]
+                self.mount_nasmyth_encoders.nasmyth2Encoder1Raw[i] = axis_encoder_counts[Axis.NA2]
+                self.mount_nasmyth_encoders.nasmyth2Encoder2Raw[i] = axis_encoder_counts[Axis.NA2]
+                self.mount_nasmyth_encoders.nasmyth2Encoder3Raw[i] = axis_encoder_counts[Axis.NA2]
 
                 self.torqueDemand.elevationMotorTorque[i] = torque[Axis.Elevation]
                 self.torqueDemand.azimuthMotor1Torque[i] = torque[Axis.Azimuth]
@@ -957,53 +872,25 @@ class McsSimulator(attcpip.AtSimulator):
                 self.measuredTorque.nasmyth1MotorTorque[i] = torque[Axis.NA1]
                 self.measuredTorque.nasmyth2MotorTorque[i] = torque[Axis.NA2]
 
-                self.measuredMotorVelocity.elevationMotorVelocity[i] = curr_vel[
-                    Axis.Elevation
-                ]
-                self.measuredMotorVelocity.azimuthMotor1Velocity[i] = curr_vel[
-                    Axis.Azimuth
-                ]
-                self.measuredMotorVelocity.azimuthMotor2Velocity[i] = curr_vel[
-                    Axis.Azimuth
-                ]
+                self.measuredMotorVelocity.elevationMotorVelocity[i] = curr_vel[Axis.Elevation]
+                self.measuredMotorVelocity.azimuthMotor1Velocity[i] = curr_vel[Axis.Azimuth]
+                self.measuredMotorVelocity.azimuthMotor2Velocity[i] = curr_vel[Axis.Azimuth]
                 self.measuredMotorVelocity.nasmyth1MotorVelocity[i] = curr_vel[Axis.NA1]
                 self.measuredMotorVelocity.nasmyth2MotorVelocity[i] = curr_vel[Axis.NA2]
 
-                self.azel_mountMotorEncoders.elevationEncoder[i] = motor_pos[
-                    Axis.Elevation
-                ]
-                self.azel_mountMotorEncoders.azimuth1Encoder[i] = motor_pos[
-                    Axis.Azimuth
-                ]
-                self.azel_mountMotorEncoders.azimuth2Encoder[i] = motor_pos[
-                    Axis.Azimuth
-                ]
-                self.azel_mountMotorEncoders.elevationEncoderRaw[i] = (
-                    motor_encoder_counts[Axis.Elevation]
-                )
-                self.azel_mountMotorEncoders.azimuth1EncoderRaw[i] = (
-                    motor_encoder_counts[Axis.Azimuth]
-                )
-                self.azel_mountMotorEncoders.azimuth2EncoderRaw[i] = (
-                    motor_encoder_counts[Axis.Azimuth]
-                )
+                self.azel_mountMotorEncoders.elevationEncoder[i] = motor_pos[Axis.Elevation]
+                self.azel_mountMotorEncoders.azimuth1Encoder[i] = motor_pos[Axis.Azimuth]
+                self.azel_mountMotorEncoders.azimuth2Encoder[i] = motor_pos[Axis.Azimuth]
+                self.azel_mountMotorEncoders.elevationEncoderRaw[i] = motor_encoder_counts[Axis.Elevation]
+                self.azel_mountMotorEncoders.azimuth1EncoderRaw[i] = motor_encoder_counts[Axis.Azimuth]
+                self.azel_mountMotorEncoders.azimuth2EncoderRaw[i] = motor_encoder_counts[Axis.Azimuth]
 
-                self.nasmyth_m3_mountMotorEncoders.nasmyth1Encoder[i] = motor_pos[
-                    Axis.NA1
-                ]
-                self.nasmyth_m3_mountMotorEncoders.nasmyth2Encoder[i] = motor_pos[
-                    Axis.NA2
-                ]
+                self.nasmyth_m3_mountMotorEncoders.nasmyth1Encoder[i] = motor_pos[Axis.NA1]
+                self.nasmyth_m3_mountMotorEncoders.nasmyth2Encoder[i] = motor_pos[Axis.NA2]
                 self.nasmyth_m3_mountMotorEncoders.m3Encoder[i] = motor_pos[Axis.M3]
-                self.nasmyth_m3_mountMotorEncoders.nasmyth1EncoderRaw[i] = (
-                    motor_encoder_counts[Axis.NA1]
-                )
-                self.nasmyth_m3_mountMotorEncoders.nasmyth2EncoderRaw[i] = (
-                    motor_encoder_counts[Axis.NA2]
-                )
-                self.nasmyth_m3_mountMotorEncoders.m3EncoderRaw[i] = (
-                    motor_encoder_counts[Axis.M3]
-                )
+                self.nasmyth_m3_mountMotorEncoders.nasmyth1EncoderRaw[i] = motor_encoder_counts[Axis.NA1]
+                self.nasmyth_m3_mountMotorEncoders.nasmyth2EncoderRaw[i] = motor_encoder_counts[Axis.NA2]
+                self.nasmyth_m3_mountMotorEncoders.m3EncoderRaw[i] = motor_encoder_counts[Axis.M3]
 
             await self._write_telemetry(
                 tel_id=Telemetry.TRAJECTORY,
@@ -1063,9 +950,7 @@ class McsSimulator(attcpip.AtSimulator):
                 actuator.stop()
         self._disable_all_drives_task.cancel()
         if not already_stopped:
-            self._disable_all_drives_task = asyncio.create_task(
-                self._finish_disable_all_drives()
-            )
+            self._disable_all_drives_task = asyncio.create_task(self._finish_disable_all_drives())
         await self.update_events()
 
     async def _finish_disable_all_drives(self) -> None:
@@ -1090,9 +975,7 @@ class McsSimulator(attcpip.AtSimulator):
     async def start_tasks(self) -> None:
         """Start background tasks."""
         if self._events_and_telemetry_task.done():
-            self._events_and_telemetry_task = asyncio.create_task(
-                self.events_and_telemetry_loop()
-            )
+            self._events_and_telemetry_task = asyncio.create_task(self.events_and_telemetry_loop())
 
     async def stop_tasks(self) -> None:
         """Stop background tasks."""
