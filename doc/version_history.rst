@@ -8,6 +8,21 @@ Version History
 
 .. towncrier release notes start
 
+v2.1.3 (2025-11-04)
+===================
+
+Performance Enhancement
+-----------------------
+
+- Made sure to let the simulator choose the TCP/IP ports. (`OSW-1275 <https://rubinobs.atlassian.net//browse/OSW-1275>`_)
+
+
+Other Changes and Additions
+---------------------------
+
+- Formatted code with ruff. (`OSW-1275 <https://rubinobs.atlassian.net//browse/OSW-1275>`_)
+
+
 v2.1.2 (2025-10-09)
 ===================
 
