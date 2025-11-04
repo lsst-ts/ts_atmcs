@@ -67,11 +67,7 @@ class ATMCSCsc(attcpip.AtTcpipCsc):
 
     async def start_clients(self) -> None:
         if self.simulation_mode == 1 and self.simulator is None:
-            self.simulator = McsSimulator(
-                host=self.config.host,
-                cmd_evt_port=self.config.cmd_evt_port,
-                telemetry_port=self.config.telemetry_port,
-            )
+            self.simulator = McsSimulator(host=self.config.host, cmd_evt_port=0, telemetry_port=0)
             await self.simulator.configure()
         await super().start_clients()
 
@@ -112,9 +108,7 @@ class ATMCSCsc(attcpip.AtTcpipCsc):
         self.log.debug("Sending setInstrumentPort.")
         async with asyncio.timeout(self.cmd_done_timeout):
             port = data.port
-            command_issued = await self.write_command(
-                command=Command.SET_INSTRUMENT_PORT, port=port
-            )
+            command_issued = await self.write_command(command=Command.SET_INSTRUMENT_PORT, port=port)
             await command_issued.done
 
     async def do_stopTracking(self, data: salobj.BaseMsgType) -> None:
