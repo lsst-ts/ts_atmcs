@@ -26,6 +26,7 @@ import typing
 import unittest
 
 import jsonschema
+
 from lsst.ts import atmcs, attcpip, tcpip, utils
 from lsst.ts.xml import sal_enums
 
