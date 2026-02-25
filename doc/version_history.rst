@@ -8,6 +8,16 @@ Version History
 
 .. towncrier release notes start
 
+v2.1.4 (2026-02-25)
+===================
+
+Other Changes and Additions
+---------------------------
+
+- Formatted the imports with ruff. (`OSW-1872 <https://rubinobs.atlassian.net//browse/OSW-1872>`_)
+- Fixed the documentation build. (`OSW-1872 <https://rubinobs.atlassian.net//browse/OSW-1872>`_)
+
+
 v2.1.3 (2025-11-04)
 ===================
 
