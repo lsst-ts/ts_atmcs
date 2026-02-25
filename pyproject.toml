@@ -7,7 +7,7 @@ name = "ts_atmcs"
 description = "An LSST Telescope and Site package that provides a CSC for the auxiliary telescope motor control system (ATMCS)."
 license = { text = "GPL" }
 classifiers = ["Programming Language :: Python :: 3"]
-urls = { documentation = "https://ts-atmcs.lsst.io", repository = "https://github.com/lsst-ts/ts_atmcs" }
+urls = { documentation = "https://ts-atmcs.lsst.io", source_code = "https://github.com/lsst-ts/ts_atmcs" }
 dynamic = ["version"]
 
 [tool.setuptools.dynamic]

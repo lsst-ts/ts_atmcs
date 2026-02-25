@@ -26,6 +26,7 @@ from typing import Any
 
 import numpy as np
 import pytest
+
 from lsst.ts import atmcs, salobj, simactuators, utils
 from lsst.ts.xml import sal_enums
 from lsst.ts.xml.enums.ATMCS import AtMountState, M3ExitPort, M3State
