@@ -57,6 +57,8 @@ CONFIG_DIR = pathlib.Path(__file__).parent / "data" / "config"
 
 
 class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
+    _randomize_topic_subname = True
+
     def setUp(self) -> None:
         super().setUp()
         self.axis_names = (  # names of axes for trackTarget command
