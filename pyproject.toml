@@ -16,6 +16,9 @@ version = { attr = "setuptools_scm.get_version" }
 [tool.setuptools.packages.find]
 where = ["python"]
 
+[project.scripts]
+run_atmcs = "lsst.ts.atmcs:run_atmcs"
+
 [tool.setuptools_scm]
 
 [tool.pytest.ini_options]
